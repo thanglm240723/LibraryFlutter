@@ -4,13 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:librarybookshelf/services/reading_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:librarybookshelf/models/reading_screen_model.dart';
+import 'package:librarybookshelf/services/reading_progress_service';
+import 'package:librarybookshelf/services/reading_service.dart';
+import 'package:librarybookshelf/services/auther_service.dart';
 
-// =====================================================================
-//  READING SCREEN
-// =====================================================================
 class ReadingScreen extends StatefulWidget {
   final int bookId;
   final String bookTitle;
@@ -36,13 +34,12 @@ class _ReadingScreenState extends State<ReadingScreen> {
   List<ChapterListItem> _chapterList = [];
   ChapterContent? _currentContent;
   bool _isLoading = true;
+  bool _isEndOfBook = false; // hết chương hiện có
 
-  // Settings
   double _fontSize = 16.0;
   bool _isDarkMode = false;
-  bool _showSettings = false; // hiện/ẩn settings bar
+  bool _showSettings = false;
 
-  // ── Theme helpers ─────────────────────────────────────────────────
   Color get _bg =>
       _isDarkMode ? const Color(0xFF181410) : const Color(0xFFFAF7F2);
   Color get _surface => _isDarkMode ? const Color(0xFF242018) : Colors.white;
@@ -73,16 +70,11 @@ class _ReadingScreenState extends State<ReadingScreen> {
     setState(() => _isLoading = true);
     try {
       final list = await _service.fetchChapterList(widget.bookId);
-      final content = await _service.fetchChapter(
-        widget.bookId,
-        _currentChapter,
-      );
       setState(() {
         _chapterList = list;
         _totalChapters = list.length;
-        _currentContent = content;
-        _isLoading = false;
       });
+      await _loadChapterContent(_currentChapter);
     } catch (e) {
       setState(() => _isLoading = false);
       _showSnack("Lỗi tải dữ liệu: $e");
@@ -90,36 +82,52 @@ class _ReadingScreenState extends State<ReadingScreen> {
   }
 
   Future<void> _loadChapter(int chapterNumber) async {
-    if (chapterNumber < 1 || chapterNumber > _totalChapters) return;
+    if (chapterNumber < 1) return;
     setState(() => _isLoading = true);
+    await _loadChapterContent(chapterNumber);
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+  Future<void> _loadChapterContent(int chapterNumber) async {
     try {
+      // Thử lấy nội dung chương từ API (cần token)
       final content = await _service.fetchChapter(widget.bookId, chapterNumber);
+
+      if (content == null) {
+        // 204 NoContent = hết chương hiện có trong DB
+        setState(() {
+          _isEndOfBook = true;
+          _isLoading = false;
+          _showSettings = false;
+        });
+        return;
+      }
+
       setState(() {
         _currentChapter = chapterNumber;
         _currentContent = content;
         _isLoading = false;
+        _isEndOfBook = false;
         _showSettings = false;
       });
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-      await _saveProgress();
+
+      // Lưu tiến trình lên server
+      await _saveProgress(chapterNumber);
     } catch (e) {
       setState(() => _isLoading = false);
       _showSnack("Lỗi tải chương: $e");
     }
   }
 
-  Future<void> _saveProgress() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('reading_chapter_${widget.bookId}', _currentChapter);
-    final readBooks = prefs.getStringList('reading_books') ?? [];
-    if (!readBooks.contains(widget.bookId.toString())) {
-      readBooks.add(widget.bookId.toString());
-      await prefs.setStringList('reading_books', readBooks);
-    }
+  Future<void> _saveProgress(int chapter) async {
+    await ReadingProgressService.saveProgress(
+      bookId: widget.bookId,
+      currentChapter: chapter,
+    );
   }
 
   void _showSnack(String msg) {
@@ -138,15 +146,12 @@ class _ReadingScreenState extends State<ReadingScreen> {
   double get _progressValue =>
       _totalChapters > 0 ? _currentChapter / _totalChapters : 0;
 
-  // =====================================================================
-  //  BUILD
-  // =====================================================================
   @override
   Widget build(BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
     final botPad = MediaQuery.of(context).padding.bottom;
 
-    if (_isLoading && _currentContent == null) {
+    if (_isLoading && _currentContent == null && !_isEndOfBook) {
       return Scaffold(
         backgroundColor: _bg,
         body: const Center(
@@ -155,14 +160,99 @@ class _ReadingScreenState extends State<ReadingScreen> {
       );
     }
 
+    // ── Hết chương hiện có ──────────────────────────────────────────
+    if (_isEndOfBook) {
+      return Scaffold(
+        backgroundColor: _bg,
+        appBar: AppBar(
+          backgroundColor: _bg,
+          elevation: 0,
+          leading: IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: _textPrimary,
+              size: 18,
+            ),
+          ),
+          title: Text(
+            widget.bookTitle,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: _textPrimary,
+            ),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5E6C8),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.menu_book_rounded,
+                    color: Color(0xFFD4A853),
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Hết nội dung hiện có",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "Bạn đã đọc đến chương $_currentChapter.\nNội dung các chương tiếp theo chưa được cập nhật.\nVui lòng quay lại sau!",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: _textSub, height: 1.6),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1C1712),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    "Quay về",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _bg,
       body: Stack(
         children: [
-          // ── SCROLLABLE CONTENT ──────────────────────────────────
           SingleChildScrollView(
             controller: _scrollController,
-            // padding: top (topbar height=56+topPad), bottom (bottombar ~130+botPad)
             padding: EdgeInsets.fromLTRB(
               24,
               topPad + 64,
@@ -173,19 +263,13 @@ class _ReadingScreenState extends State<ReadingScreen> {
                 ? const SizedBox.shrink()
                 : _buildBody(_currentContent!),
           ),
-
-          // ── TOP BAR ─────────────────────────────────────────────
           Positioned(top: 0, left: 0, right: 0, child: _buildTopBar(topPad)),
-
-          // ── BOTTOM BAR ──────────────────────────────────────────
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
             child: _buildBottomBar(botPad),
           ),
-
-          // ── LOADING overlay khi đổi chương ─────────────────────
           if (_isLoading)
             Container(
               color: _bg.withOpacity(0.7),
@@ -201,12 +285,10 @@ class _ReadingScreenState extends State<ReadingScreen> {
     );
   }
 
-  // ── BODY TEXT ────────────────────────────────────────────────────
   Widget _buildBody(ChapterContent chapter) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Chapter label ──────────────────────────────────────
         Text(
           "CHƯƠNG ${chapter.chapterNumber}",
           style: const TextStyle(
@@ -217,8 +299,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
           ),
         ),
         const SizedBox(height: 10),
-
-        // ── Chapter title ──────────────────────────────────────
         if (chapter.chapterTitle != null)
           Text(
             chapter.chapterTitle!,
@@ -231,16 +311,12 @@ class _ReadingScreenState extends State<ReadingScreen> {
             ),
           ),
         const SizedBox(height: 8),
-
-        // ── Word count / read time ──────────────────────────────
         if (chapter.wordCount != null)
           Text(
             "${chapter.wordCount} từ  ·  ~${((chapter.wordCount ?? 0) / 200).ceil()} phút đọc",
             style: TextStyle(fontSize: 12, color: _textSub),
           ),
         const SizedBox(height: 28),
-
-        // ── Decorative divider ──────────────────────────────────
         Row(
           children: [
             Container(width: 32, height: 2, color: _accent),
@@ -249,8 +325,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
           ],
         ),
         const SizedBox(height: 28),
-
-        // ── Paragraphs ──────────────────────────────────────────
         ...chapter.content.split('\n\n').map((p) {
           if (p.trim().isEmpty) return const SizedBox(height: 8);
           return Padding(
@@ -267,16 +341,12 @@ class _ReadingScreenState extends State<ReadingScreen> {
             ),
           );
         }),
-
         const SizedBox(height: 40),
-
-        // ── END OF CHAPTER — nút next lớn cuối trang ───────────
         _buildEndOfChapterNav(),
       ],
     );
   }
 
-  // ── TOP BAR ──────────────────────────────────────────────────────
   Widget _buildTopBar(double topPad) {
     return Container(
       padding: EdgeInsets.fromLTRB(4, topPad + 4, 4, 8),
@@ -293,14 +363,11 @@ class _ReadingScreenState extends State<ReadingScreen> {
       ),
       child: Row(
         children: [
-          // Back
           _TapIcon(
             icon: Icons.arrow_back_ios_new_rounded,
             color: _textPrimary,
             onTap: () => Navigator.pop(context),
           ),
-
-          // Prev chapter button — góc trái top bar
           _ChapterNavBtn(
             icon: Icons.chevron_left_rounded,
             label: "Trước",
@@ -310,8 +377,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
             border: _border,
             isDark: _isDarkMode,
           ),
-
-          // Title (giữa)
           Expanded(
             child: GestureDetector(
               onTap: _showChapterList,
@@ -348,8 +413,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
               ),
             ),
           ),
-
-          // Next chapter button — góc phải top bar
           _ChapterNavBtn(
             icon: Icons.chevron_right_rounded,
             label: "Sau",
@@ -360,10 +423,8 @@ class _ReadingScreenState extends State<ReadingScreen> {
             isDark: _isDarkMode,
             isNext: true,
           ),
-
-          // Settings toggle
           _TapIcon(
-            icon: _showSettings ? Icons.tune_rounded : Icons.tune_rounded,
+            icon: Icons.tune_rounded,
             color: _showSettings ? _accent : _textPrimary,
             onTap: () => setState(() => _showSettings = !_showSettings),
           ),
@@ -372,7 +433,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
     );
   }
 
-  // ── BOTTOM BAR ────────────────────────────────────────────────────
   Widget _buildBottomBar(double botPad) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
@@ -392,12 +452,11 @@ class _ReadingScreenState extends State<ReadingScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Progress bar ──────────────────────────────────────
           Row(
             children: [
               Text(
                 "${(_progressValue * 100).toInt()}%",
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: _accent,
@@ -422,8 +481,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
               ),
             ],
           ),
-
-          // ── SETTINGS (hiện khi toggle) ────────────────────────
           if (_showSettings) ...[
             const SizedBox(height: 14),
             Container(
@@ -435,7 +492,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
               ),
               child: Row(
                 children: [
-                  // Dark/Light mode
                   Text(
                     "Giao diện",
                     style: TextStyle(fontSize: 12, color: _textSub),
@@ -464,10 +520,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                       border: _border,
                     ),
                   ),
-
                   const Spacer(),
-
-                  // Font size
                   Text(
                     "Cỡ chữ",
                     style: TextStyle(fontSize: 12, color: _textSub),
@@ -510,7 +563,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
     );
   }
 
-  // ── END OF CHAPTER nav (cuối trang) ──────────────────────────────
   Widget _buildEndOfChapterNav() {
     final hasNext = _currentChapter < _totalChapters;
     final hasPrev = _currentChapter > 1;
@@ -524,7 +576,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
       ),
       child: Column(
         children: [
-          // Finished reading this chapter
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -552,9 +603,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
             ],
           ),
           const SizedBox(height: 16),
-
           if (!hasNext)
-            // Đọc xong toàn bộ sách
             Column(
               children: [
                 const Text("🎉", style: TextStyle(fontSize: 32)),
@@ -587,10 +636,8 @@ class _ReadingScreenState extends State<ReadingScreen> {
               ],
             )
           else
-            // Nút Next lớn cuối trang
             Row(
               children: [
-                // Nút Prev nhỏ
                 if (hasPrev)
                   GestureDetector(
                     onTap: () => _loadChapter(_currentChapter - 1),
@@ -609,8 +656,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
                       ),
                     ),
                   ),
-
-                // Nút Next lớn
                 Expanded(
                   child: GestureDetector(
                     onTap: () => _loadChapter(_currentChapter + 1),
@@ -649,7 +694,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
     );
   }
 
-  // ── CHAPTER LIST bottom sheet ─────────────────────────────────────
   void _showChapterList() {
     showModalBottomSheet(
       context: context,
@@ -659,7 +703,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
       ),
       builder: (ctx) => Column(
         children: [
-          // Handle
           Container(
             margin: const EdgeInsets.only(top: 12, bottom: 4),
             width: 36,
@@ -755,10 +798,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
   }
 }
 
-// =====================================================================
-//  HELPER WIDGETS
-// =====================================================================
-
+// ── HELPER WIDGETS ────────────────────────────────────────────────────
 class _TapIcon extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -768,7 +808,6 @@ class _TapIcon extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
@@ -779,7 +818,6 @@ class _TapIcon extends StatelessWidget {
   );
 }
 
-// Nút Prev/Next nhỏ gọn trên top bar
 class _ChapterNavBtn extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -789,7 +827,6 @@ class _ChapterNavBtn extends StatelessWidget {
   final Color textColor;
   final Color border;
   final bool isDark;
-
   const _ChapterNavBtn({
     required this.icon,
     required this.label,
@@ -800,58 +837,52 @@ class _ChapterNavBtn extends StatelessWidget {
     required this.isDark,
     this.isNext = false,
   });
-
   @override
-  Widget build(BuildContext context) {
-    final activeColor = enabled ? textColor : border;
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: enabled && isNext
-              ? const Color(0xFF1C1712)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: enabled
-                ? (isNext ? const Color(0xFF1C1712) : border)
-                : border.withOpacity(0.4),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isNext)
-              Icon(
-                icon,
-                size: 16,
-                color: enabled ? activeColor : border.withOpacity(0.4),
-              ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: enabled
-                    ? (isNext ? Colors.white : textColor)
-                    : border.withOpacity(0.4),
-              ),
-            ),
-            if (isNext)
-              Icon(
-                icon,
-                size: 16,
-                color: enabled
-                    ? const Color(0xFFD4A853)
-                    : border.withOpacity(0.4),
-              ),
-          ],
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: enabled ? onTap : null,
+    child: Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: enabled && isNext ? const Color(0xFF1C1712) : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: enabled
+              ? (isNext ? const Color(0xFF1C1712) : border)
+              : border.withOpacity(0.4),
         ),
       ),
-    );
-  }
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!isNext)
+            Icon(
+              icon,
+              size: 16,
+              color: enabled ? textColor : border.withOpacity(0.4),
+            ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: enabled
+                  ? (isNext ? Colors.white : textColor)
+                  : border.withOpacity(0.4),
+            ),
+          ),
+          if (isNext)
+            Icon(
+              icon,
+              size: 16,
+              color: enabled
+                  ? const Color(0xFFD4A853)
+                  : border.withOpacity(0.4),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _ModeBtn extends StatelessWidget {
@@ -861,7 +892,6 @@ class _ModeBtn extends StatelessWidget {
   final Color activeColor;
   final Color textColor;
   final Color border;
-
   const _ModeBtn({
     required this.icon,
     required this.label,
@@ -870,7 +900,6 @@ class _ModeBtn extends StatelessWidget {
     required this.textColor,
     required this.border,
   });
-
   @override
   Widget build(BuildContext context) => AnimatedContainer(
     duration: const Duration(milliseconds: 200),
@@ -908,7 +937,6 @@ class _FontBtn extends StatelessWidget {
   final bool enabled;
   final Color border;
   final Color textColor;
-
   const _FontBtn({
     required this.icon,
     required this.onTap,
@@ -916,7 +944,6 @@ class _FontBtn extends StatelessWidget {
     required this.border,
     required this.textColor,
   });
-
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: enabled ? onTap : null,

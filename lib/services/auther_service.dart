@@ -110,4 +110,18 @@ class AuthService {
     await prefs.remove('role');
     await prefs.remove('userId');
   }
+
+  static Future<Map<String, dynamic>?> getUserInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token == null || token.isEmpty) return null;
+
+    return {
+      'username': prefs.getString('username') ?? '',
+      'fullName': prefs.getString('fullName') ?? '',
+      'email': prefs.getString('email') ?? '',
+      'role': prefs.getString('role') ?? 'user',
+      'userId': prefs.getInt('userId') ?? 0,
+    };
+  }
 }

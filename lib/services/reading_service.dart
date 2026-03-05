@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:librarybookshelf/models/reading_screen_model.dart';
+import 'package:librarybookshelf/services/auther_service.dart';
 
 class ReadingService {
   String get _base {
@@ -21,13 +22,24 @@ class ReadingService {
     throw Exception('Không thể tải danh sách chương');
   }
 
-  Future<ChapterContent> fetchChapter(int bookId, int chapterNumber) async {
+  // ✅ Sửa: thêm token header + return nullable để xử lý 204 NoContent
+  Future<ChapterContent?> fetchChapter(int bookId, int chapterNumber) async {
+    final headers = await AuthService.authHeaders();
     final res = await http.get(
       Uri.parse('$_base/$bookId/chapters/$chapterNumber'),
+      headers: headers,
     );
+
     if (res.statusCode == 200) {
       return ChapterContent.fromJson(jsonDecode(res.body));
     }
-    throw Exception('Không thể tải nội dung chương');
+    if (res.statusCode == 204) {
+      // Hết chương hiện có trong DB → trả null, không throw
+      return null;
+    }
+    if (res.statusCode == 401) {
+      throw Exception('Phiên đăng nhập hết hạn, vui lòng đăng nhập lại');
+    }
+    throw Exception('Không thể tải nội dung chương (${res.statusCode})');
   }
 }

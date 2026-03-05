@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:librarybookshelf/services/auther_service.dart';
-import 'package:librarybookshelf/services/reading_progress_service';
+import 'package:librarybookshelf/services/reading_progress_service.dart';
 import 'package:librarybookshelf/theme/book_detail_widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:librarybookshelf/models/book_detail_model.dart';
@@ -11,9 +11,6 @@ import 'package:librarybookshelf/services/book_detail_service.dart';
 import 'package:librarybookshelf/reading_screen.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
 
-// =====================================================================
-//  BOOK DETAIL SCREEN - chỉ chứa STATE LOGIC
-// =====================================================================
 class BookDetailScreen extends StatefulWidget {
   final int bookId;
   final String? heroTag;
@@ -41,7 +38,6 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     _loadReadingProgress();
   }
 
-  // ── LOGIC: Load tiến trình từ server ─────────────────────────────
   Future<void> _loadReadingProgress() async {
     final loggedIn = await AuthService.isLoggedIn();
     if (!loggedIn) return;
@@ -55,7 +51,6 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     }
   }
 
-  // ── LOGIC: Toggle lưu sách ────────────────────────────────────────
   void _toggleSave(BookDetail book) {
     setState(() => _isSaved = !_isSaved);
     AppSnack.show(
@@ -65,13 +60,11 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     );
   }
 
-  // ── LOGIC: Bắt đầu / tiếp tục đọc ───────────────────────────────
   Future<void> _startReading(BookDetail book) async {
     final loggedIn = await AuthService.isLoggedIn();
 
     if (!loggedIn) {
       if (!mounted) return;
-      // Delegate hiện dialog sang widget
       showLoginRequiredDialog(
         context: context,
         onLogin: () => Navigator.of(context).pushNamed('/login'),
@@ -93,7 +86,6 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     }
   }
 
-  // ── LOGIC: Tải file ───────────────────────────────────────────────
   Future<void> _download(BookDetail book) async {
     if (book.fileUrl == null || book.fileUrl!.isEmpty) {
       AppSnack.show(context, "Sách này chưa có file để tải về", isError: true);
@@ -171,7 +163,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         }
 
         final book = snapshot.data!;
-        // Delegate toàn bộ UI sang BookDetailView
+
         return BookDetailView(
           book: book,
           heroTag: widget.heroTag,

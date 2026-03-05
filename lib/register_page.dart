@@ -3,9 +3,6 @@ import 'package:librarybookshelf/services/auther_service.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
 import 'package:librarybookshelf/theme/register_widgets.dart';
 
-// =====================================================================
-//  REGISTER PAGE - chỉ chứa STATE LOGIC
-// =====================================================================
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 

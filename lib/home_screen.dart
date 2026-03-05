@@ -1,28 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:librarybookshelf/book_detail_screen.dart';
+import 'package:librarybookshelf/profile_screen.dart';
+import 'package:librarybookshelf/services/auther_service.dart';
 import '../models/book_model.dart';
 import '../services/book_service.dart';
-// import 'loginscreen.dart'; // bỏ comment nếu đã có file này
+import '../theme/app_theme.dart';
 
-// =====================================================================
-//  COLOR PALETTE & THEME
-// =====================================================================
-class AppColors {
-  static const bg = Color(0xFFFAF7F2); // Cream ấm
-  static const surface = Color(0xFFFFFFFF);
-  static const cardBg = Color(0xFF1C1712); // Dark brown/charcoal
-  static const accent = Color(0xFFD4A853); // Gold
-  static const accentLight = Color(0xFFF5E6C8); // Pale gold
-  static const textDark = Color(0xFF1C1712);
-  static const textMid = Color(0xFF6B5B45);
-  static const textLight = Color(0xFFA89880);
-  static const chip = Color(0xFFEDE8DF);
-  static const chipSelected = Color(0xFF1C1712);
-}
-
-// =====================================================================
-//  HOME SCREEN
-// =====================================================================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -38,10 +21,32 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedGenre = "Tất cả";
   final _genres = ["Tất cả", "Tiểu thuyết", "Kỹ năng", "Kinh tế", "Lịch sử"];
 
+  bool _isLoggedIn = false;
+  String _displayName = '';
+
   @override
   void initState() {
     super.initState();
     _futureBooks = _bookService.fetchBooks();
+    _checkLoginState();
+  }
+
+  Future<void> _checkLoginState() async {
+    final loggedIn = await AuthService.isLoggedIn();
+    if (loggedIn) {
+      final info = await AuthService.getUserInfo();
+      setState(() {
+        _isLoggedIn = true;
+
+        final fullName = info?['fullName'] ?? '';
+        final username = info?['username'] ?? '';
+        _displayName = fullName.isNotEmpty
+            ? fullName.split(' ').last
+            : username;
+      });
+    } else {
+      setState(() => _isLoggedIn = false);
+    }
   }
 
   void _onSearch(String query) {
@@ -53,11 +58,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onGenreSelected(String genre) {
     setState(() {
       _selectedGenre = genre;
-      if (genre == "Tất cả") {
-        _futureBooks = _bookService.fetchBooks();
-      } else {
-        _futureBooks = _bookService.fetchBooks(searchTerm: genre);
-      }
+      _futureBooks = genre == "Tất cả"
+          ? _bookService.fetchBooks()
+          : _bookService.fetchBooks(searchTerm: genre);
     });
   }
 
@@ -74,16 +77,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            // ── APP BAR ──────────────────────────────────────────────
             SliverToBoxAdapter(child: _buildHeader(context)),
-
-            // ── SEARCH BAR ───────────────────────────────────────────
             SliverToBoxAdapter(child: _buildSearchBar()),
-
-            // ── GENRE CHIPS ──────────────────────────────────────────
             SliverToBoxAdapter(child: _buildGenreChips()),
-
-            // ── SECTION LABEL ────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
@@ -111,8 +107,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-
-            // ── BOOK GRID ────────────────────────────────────────────
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               sliver: FutureBuilder<List<BookModel>>(
@@ -160,19 +154,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── HEADER ──────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
       color: AppColors.bg,
       child: Row(
         children: [
-          // Logo + title
+          // Logo
           Container(
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: AppColors.cardBg,
+              color: AppColors.card,
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
@@ -205,25 +198,95 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const Spacer(),
-          // Nút ĐĂNG KÝ
-          _HeaderButton(
-            label: "Đăng ký",
-            onTap: () => Navigator.of(context).pushNamed('/register'),
-            filled: false,
-          ),
-          const SizedBox(width: 8),
-          // Nút ĐĂNG NHẬP
-          _HeaderButton(
-            label: "Đăng nhập",
-            onTap: () => Navigator.of(context).pushNamed('/login'),
-            filled: true,
-          ),
+
+          // ── AUTH BUTTONS: ẩn/hiện theo trạng thái đăng nhập ──────
+          if (_isLoggedIn) ...[
+            // Nút "Tài khoản" khi đã đăng nhập
+            GestureDetector(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+                // Refresh lại trạng thái khi quay về (vd sau khi đăng xuất)
+                _checkLoginState();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          _displayName.isNotEmpty
+                              ? _displayName[0].toUpperCase()
+                              : 'U',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      _displayName,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.accent,
+                      size: 16,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else ...[
+            // Nút Đăng ký + Đăng nhập khi chưa đăng nhập
+            _HeaderButton(
+              label: "Đăng ký",
+              onTap: () async {
+                await Navigator.of(context).pushNamed('/register');
+                _checkLoginState();
+              },
+              filled: false,
+            ),
+            const SizedBox(width: 8),
+            _HeaderButton(
+              label: "Đăng nhập",
+              onTap: () async {
+                await Navigator.of(context).pushNamed('/login');
+                _checkLoginState();
+              },
+              filled: true,
+            ),
+          ],
         ],
       ),
     );
   }
 
-  // ── SEARCH BAR ──────────────────────────────────────────────────────
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -270,7 +333,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── GENRE CHIPS ─────────────────────────────────────────────────────
   Widget _buildGenreChips() {
     return SizedBox(
       height: 48,
@@ -288,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
-                color: selected ? AppColors.chipSelected : AppColors.chip,
+                color: selected ? AppColors.card : AppColors.chip,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -306,7 +368,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── BOOK GRID ────────────────────────────────────────────────────────
   SliverGrid _buildBookGrid(List<BookModel> books) {
     return SliverGrid(
       delegate: SliverChildBuilderDelegate(
@@ -322,7 +383,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── ERROR STATE ──────────────────────────────────────────────────────
   Widget _buildErrorState(String error) {
     return Container(
       height: 220,
@@ -345,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             "Kiểm tra kết nối và thử lại",
             style: TextStyle(fontSize: 12, color: AppColors.textLight),
           ),
@@ -364,14 +424,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// =====================================================================
-//  HEADER BUTTON WIDGET
-// =====================================================================
+// ── HEADER BUTTON ─────────────────────────────────────────────────────
 class _HeaderButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final bool filled;
-
   const _HeaderButton({
     required this.label,
     required this.onTap,
@@ -379,34 +436,30 @@ class _HeaderButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: filled ? AppColors.cardBg : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: filled
-              ? null
-              : Border.all(color: AppColors.textLight.withOpacity(0.5)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: filled ? Colors.white : AppColors.textMid,
-          ),
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: filled ? AppColors.card : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        border: filled
+            ? null
+            : Border.all(color: AppColors.textLight.withOpacity(0.5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: filled ? Colors.white : AppColors.textMid,
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
-// =====================================================================
-//  BOOK CARD WIDGET
-// =====================================================================
+// ── BOOK CARD ─────────────────────────────────────────────────────────
 class _BookCard extends StatelessWidget {
   final BookModel book;
   const _BookCard({required this.book});
@@ -414,17 +467,15 @@ class _BookCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BookDetailScreen(
-              bookId: book.bookId,
-              heroTag: 'book_${book.bookId}',
-            ),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BookDetailScreen(
+            bookId: book.bookId,
+            heroTag: 'book_${book.bookId}',
           ),
-        );
-      },
+        ),
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -440,7 +491,6 @@ class _BookCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── COVER IMAGE ──────────────────────────────
             Expanded(
               flex: 5,
               child: ClipRRect(
@@ -450,7 +500,6 @@ class _BookCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Cover
                     book.coverImageUrl != null
                         ? Image.network(
                             book.coverImageUrl!,
@@ -458,7 +507,6 @@ class _BookCard extends StatelessWidget {
                             errorBuilder: (_, __, ___) => _placeholder(),
                           )
                         : _placeholder(),
-                    // Rating badge góc trên phải
                     if (book.rating != null)
                       Positioned(
                         top: 8,
@@ -469,7 +517,7 @@ class _BookCard extends StatelessWidget {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.cardBg.withOpacity(0.85),
+                            color: AppColors.card.withOpacity(0.85),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -497,8 +545,6 @@ class _BookCard extends StatelessWidget {
                 ),
               ),
             ),
-
-            // ── BOOK INFO ────────────────────────────────
             Expanded(
               flex: 3,
               child: Padding(
@@ -506,7 +552,6 @@ class _BookCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Genre tag
                     if (book.genre != null)
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -515,7 +560,7 @@ class _BookCard extends StatelessWidget {
                         ),
                         margin: const EdgeInsets.only(bottom: 5),
                         decoration: BoxDecoration(
-                          color: AppColors.accentLight,
+                          color: AppColors.accentL,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -528,7 +573,6 @@ class _BookCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                    // Title
                     Text(
                       book.title,
                       maxLines: 2,
@@ -541,7 +585,6 @@ class _BookCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    // Author
                     Text(
                       book.author,
                       maxLines: 1,
@@ -552,23 +595,19 @@ class _BookCard extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    // Bottom row: bookmark icon
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        GestureDetector(
-                          onTap: () {},
-                          child: Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: AppColors.chip,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.bookmark_border_rounded,
-                              size: 15,
-                              color: AppColors.textMid,
-                            ),
+                        Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: AppColors.chip,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.bookmark_border_rounded,
+                            size: 15,
+                            color: AppColors.textMid,
                           ),
                         ),
                       ],
@@ -583,12 +622,10 @@ class _BookCard extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() {
-    return Container(
-      color: AppColors.accentLight,
-      child: const Center(
-        child: Icon(Icons.menu_book_rounded, color: AppColors.accent, size: 40),
-      ),
-    );
-  }
+  Widget _placeholder() => Container(
+    color: AppColors.accentL,
+    child: const Center(
+      child: Icon(Icons.menu_book_rounded, color: AppColors.accent, size: 40),
+    ),
+  );
 }

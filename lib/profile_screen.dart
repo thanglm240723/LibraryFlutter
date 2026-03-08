@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:librarybookshelf/services/auther_service.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
+import 'package:librarybookshelf/saved_books_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -587,15 +588,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             "Tính năng đang phát triển",
                           ),
                         ),
+                        // _MenuItem(
+                        //   icon: Icons.bookmark_outline_rounded,
+                        //   label: "Sách đã lưu",
+                        //   sub: "Danh sách yêu thích của bạn",
+                        //   onTap: () => AppSnack.show(
+                        //     context,
+                        //     "Tính năng đang phát triển",
+                        //   ),
+                        // ),
+
+                        // Thay thế đoạn code _MenuItem của sách đã lưu
                         _MenuItem(
                           icon: Icons.bookmark_outline_rounded,
                           label: "Sách đã lưu",
                           sub: "Danh sách yêu thích của bạn",
-                          onTap: () => AppSnack.show(
-                            context,
-                            "Tính năng đang phát triển",
-                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SavedBooksScreen(),
+                              ),
+                            );
+                          },
                         ),
+
                         _MenuItem(
                           icon: Icons.download_outlined,
                           label: "Đã tải xuống",

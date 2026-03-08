@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:librarybookshelf/models/book_model.dart';
+import 'package:librarybookshelf/services/auther_service.dart'; // thêm ở đầu file
+import 'package:librarybookshelf/models/book_detail_model.dart'; // nếu chưa có
 
 class BookService {
   String get baseUrl {
@@ -29,6 +31,20 @@ class BookService {
       return list.map((json) => BookModel.fromJson(json)).toList();
     } else {
       throw Exception('Failed to load books');
+    }
+  }
+
+  Future<BookDetail> createBook(Map<String, dynamic> bookData) async {
+    final headers = await AuthService.authHeaders();
+    final response = await http.post(
+      Uri.parse(baseUrl), // baseUrl là endpoint Books
+      headers: headers,
+      body: jsonEncode(bookData),
+    );
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return BookDetail.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Không thể tạo sách (${response.statusCode})');
     }
   }
 }

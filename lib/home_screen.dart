@@ -23,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isLoggedIn = false;
   String _displayName = '';
+  bool _isAdmin = false;
 
   @override
   void initState() {
@@ -35,9 +36,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final loggedIn = await AuthService.isLoggedIn();
     if (loggedIn) {
       final info = await AuthService.getUserInfo();
+      final isAdmin = await AuthService.isAdmin(); // gọi hàm kiểm tra admin
+
       setState(() {
         _isLoggedIn = true;
-
+        _isAdmin = isAdmin;
         final fullName = info?['fullName'] ?? '';
         final username = info?['username'] ?? '';
         _displayName = fullName.isNotEmpty
@@ -45,7 +48,10 @@ class _HomeScreenState extends State<HomeScreen> {
             : username;
       });
     } else {
-      setState(() => _isLoggedIn = false);
+      setState(() {
+        _isLoggedIn = false;
+        _isAdmin = false;
+      });
     }
   }
 
@@ -198,6 +204,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const Spacer(),
+
+          // Nếu là admin, hiển thị icon để vào Admin Panel
+          if (_isAdmin) ...[
+            IconButton(
+              icon: const Icon(
+                Icons.admin_panel_settings_rounded,
+                color: AppColors.accent,
+              ),
+              onPressed: () {
+                Navigator.pushNamed(context, '/admin');
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
 
           // ── AUTH BUTTONS: ẩn/hiện theo trạng thái đăng nhập ──────
           if (_isLoggedIn) ...[

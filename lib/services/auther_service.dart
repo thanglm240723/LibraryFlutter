@@ -37,6 +37,10 @@ class AuthService {
     final role = await getRole();
     return role == 'admin';
   }
+  // static Future<bool> isAdmin() async {
+  //   final user = await getUserInfo();
+  //   return user?['role'] == 'admin';
+  // }
 
   // ── Header có Bearer token ────────────────────────────────────────
   static Future<Map<String, String>> authHeaders() async {
@@ -70,6 +74,7 @@ class AuthService {
         await prefs.setInt('userId', data['id'] ?? 0);
         return data;
       }
+
       return null;
     } catch (e) {
       return null;

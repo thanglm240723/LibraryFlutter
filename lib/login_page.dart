@@ -74,7 +74,10 @@ class _LoginPageState extends State<LoginPage>
         "Chào mừng trở lại, ${data['fullName']}!",
         isSuccess: true,
       );
-      Navigator.of(context).pushReplacementNamed('/home');
+      // Kiểm tra nếu là admin
+      final isAdmin = data['role'] == 'admin';
+      final route = isAdmin ? '/admin-profile' : '/home';
+      Navigator.of(context).pushReplacementNamed(route);
     } else {
       AppSnack.show(context, "Sai tên đăng nhập hoặc mật khẩu", isError: true);
     }

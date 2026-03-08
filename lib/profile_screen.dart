@@ -626,6 +626,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
 
                     const SizedBox(height: 20),
+
                     _SectionLabel("HỖ TRỢ"),
                     const SizedBox(height: 8),
                     _MenuGroup(

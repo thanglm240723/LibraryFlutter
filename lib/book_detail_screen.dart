@@ -10,6 +10,10 @@ import 'package:librarybookshelf/models/book_detail_model.dart';
 import 'package:librarybookshelf/services/book_detail_service.dart';
 import 'package:librarybookshelf/reading_screen.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
+import 'package:librarybookshelf/services/user_library_service.dart';
+
+//new
+import 'package:librarybookshelf/services/user_library_service.dart';
 
 class BookDetailScreen extends StatefulWidget {
   final int bookId;
@@ -22,6 +26,9 @@ class BookDetailScreen extends StatefulWidget {
 
 class _BookDetailScreenState extends State<BookDetailScreen> {
   final _service = BookDetailService();
+  
+  final _libraryService = UserLibraryService();
+
   late Future<BookDetail> _futureDetail;
 
   // State
@@ -38,6 +45,19 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     _loadReadingProgress();
   }
 
+  // Thêm hàm này
+  Future<void> _checkInitialSavedState() async {
+    final loggedIn = await AuthService.isLoggedIn();
+    if (loggedIn) {
+      final isSaved = await _libraryService.checkIsSaved(widget.bookId);
+      if (mounted) {
+        setState(() {
+          _isSaved = isSaved;
+        });
+      }
+    }
+  }
+
   Future<void> _loadReadingProgress() async {
     final loggedIn = await AuthService.isLoggedIn();
     if (!loggedIn) return;
@@ -51,13 +71,38 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     }
   }
 
-  void _toggleSave(BookDetail book) {
-    setState(() => _isSaved = !_isSaved);
-    AppSnack.show(
-      context,
-      _isSaved ? "Đã lưu \"${book.title}\"" : "Đã bỏ lưu \"${book.title}\"",
-      isSuccess: _isSaved,
-    );
+  // void _toggleSave(BookDetail book) {
+  //   setState(() => _isSaved = !_isSaved);
+  //   AppSnack.show(
+  //     context,
+  //     _isSaved ? "Đã lưu \"${book.title}\"" : "Đã bỏ lưu \"${book.title}\"",
+  //     isSuccess: _isSaved,
+  //   );
+  // }
+  // Sửa lại hàm _toggleSave
+  Future<void> _toggleSave(BookDetail book) async {
+    final loggedIn = await AuthService.isLoggedIn();
+    if (!loggedIn) {
+      showLoginRequiredDialog(
+        context: context,
+        onLogin: () => Navigator.of(context).pushNamed('/login'),
+      );
+      return;
+    }
+
+    try {
+      final isNowSaved = await _libraryService.toggleSaveBook(book.bookId);
+      setState(() {
+        _isSaved = isNowSaved;
+      });
+      AppSnack.show(
+        context,
+        _isSaved ? "Đã lưu \"${book.title}\"" : "Đã bỏ lưu \"${book.title}\"",
+        isSuccess: _isSaved,
+      );
+    } catch (e) {
+      AppSnack.show(context, "Lỗi: $e", isError: true);
+    }
   }
 
   Future<void> _startReading(BookDetail book) async {

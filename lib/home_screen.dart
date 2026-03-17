@@ -1,28 +1,35 @@
+// lib/home_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:librarybookshelf/book_detail_screen.dart';
 import 'package:librarybookshelf/profile_screen.dart';
 import 'package:librarybookshelf/services/auther_service.dart';
+import 'package:librarybookshelf/services/user_library_service.dart';
 import '../models/book_model.dart';
 import '../services/book_service.dart';
 import '../theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final BookService _bookService = BookService();
+  final _bookService = BookService();
+  final _libraryService = UserLibraryService();
+
   late Future<List<BookModel>> _futureBooks;
 
   final _searchController = TextEditingController();
-  String _selectedGenre = "Tất cả";
-  final _genres = ["Tất cả", "Tiểu thuyết", "Kỹ năng", "Kinh tế", "Lịch sử"];
+  String _selectedGenre = 'Tất cả';
+  final _genres = ['Tất cả', 'Tiểu thuyết', 'Kỹ năng', 'Kinh tế', 'Lịch sử'];
 
   bool _isLoggedIn = false;
   String _displayName = '';
+
+  // ── Set bookId đã lưu — để BookCard biết trạng thái ────────────
+  Set<int> _savedBookIds = {};
 
   @override
   void initState() {
@@ -37,31 +44,76 @@ class _HomeScreenState extends State<HomeScreen> {
       final info = await AuthService.getUserInfo();
       setState(() {
         _isLoggedIn = true;
-
-        final fullName = info?['fullName'] ?? '';
-        final username = info?['username'] ?? '';
-        _displayName = fullName.isNotEmpty
-            ? fullName.split(' ').last
-            : username;
+        final fn = info?['fullName'] ?? '';
+        final uname = info?['username'] ?? '';
+        _displayName = fn.isNotEmpty ? fn.split(' ').last : uname;
       });
+      // Load danh sách sách đã lưu để hiện đúng icon bookmark
+      await _loadSavedIds();
     } else {
-      setState(() => _isLoggedIn = false);
+      setState(() {
+        _isLoggedIn = false;
+        _savedBookIds = {};
+      });
     }
   }
 
+  Future<void> _loadSavedIds() async {
+    try {
+      final saved = await _libraryService.fetchSavedBooks();
+      if (mounted) {
+        setState(() => _savedBookIds = saved.map((b) => b.bookId).toSet());
+      }
+    } catch (_) {}
+  }
+
+  // ── Search text ──────────────────────────────────────────────────
   void _onSearch(String query) {
     setState(() {
+      _selectedGenre = 'Tất cả';
       _futureBooks = _bookService.fetchBooks(searchTerm: query);
     });
   }
 
+  // ── Filter thể loại ──────────────────────────────────────────────
   void _onGenreSelected(String genre) {
     setState(() {
       _selectedGenre = genre;
-      _futureBooks = genre == "Tất cả"
-          ? _bookService.fetchBooks()
-          : _bookService.fetchBooks(searchTerm: genre);
+      _searchController.clear();
+      if (genre == 'Tất cả') {
+        _futureBooks = _bookService.fetchBooks();
+      } else {
+        // ── FIX: gọi endpoint Genre riêng, không dùng searchTerm ────
+        _futureBooks = _bookService.fetchBooksByGenre(genre);
+      }
     });
+  }
+
+  // ── Toggle save từ HomeScreen ────────────────────────────────────
+  Future<void> _toggleSave(BookModel book) async {
+    if (!_isLoggedIn) {
+      if (!mounted) return;
+      Navigator.of(context).pushNamed('/login').then((_) => _checkLoginState());
+      return;
+    }
+    try {
+      final isNowSaved = await _libraryService.toggleSaveBook(book.bookId);
+      if (!mounted) return;
+      setState(() {
+        if (isNowSaved) {
+          _savedBookIds.add(book.bookId);
+        } else {
+          _savedBookIds.remove(book.bookId);
+        }
+      });
+      AppSnack.show(
+        context,
+        isNowSaved ? 'Đã lưu "${book.title}"' : 'Đã bỏ lưu "${book.title}"',
+        isSuccess: isNowSaved,
+      );
+    } catch (e) {
+      if (mounted) AppSnack.show(context, 'Lỗi: $e', isError: true);
+    }
   }
 
   @override
@@ -94,9 +146,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const Text(
-                      "Khám phá sách",
-                      style: TextStyle(
+                    Text(
+                      _selectedGenre == 'Tất cả'
+                          ? 'Khám phá sách'
+                          : _selectedGenre,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textDark,
@@ -132,17 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                   final books = snapshot.data ?? [];
                   if (books.isEmpty) {
-                    return const SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: 200,
-                        child: Center(
-                          child: Text(
-                            "Không tìm thấy sách nào.",
-                            style: TextStyle(color: AppColors.textMid),
-                          ),
-                        ),
-                      ),
-                    );
+                    return SliverToBoxAdapter(child: _buildEmptyState());
                   }
                   return _buildBookGrid(books);
                 },
@@ -160,7 +204,6 @@ class _HomeScreenState extends State<HomeScreen> {
       color: AppColors.bg,
       child: Row(
         children: [
-          // Logo
           Container(
             width: 36,
             height: 36,
@@ -179,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "BookShelf",
+                'BookShelf',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -188,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Text(
-                "Thư viện cá nhân",
+                'Thư viện cá nhân',
                 style: TextStyle(
                   fontSize: 11,
                   color: AppColors.textLight,
@@ -198,18 +241,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const Spacer(),
-
-          // ── AUTH BUTTONS: ẩn/hiện theo trạng thái đăng nhập ──────
           if (_isLoggedIn) ...[
-            // Nút "Tài khoản" khi đã đăng nhập
             GestureDetector(
               onTap: () async {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ProfileScreen()),
                 );
-                // Refresh lại trạng thái khi quay về (vd sau khi đăng xuất)
-                _checkLoginState();
+                _checkLoginState(); // refresh sau khi quay về
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -263,23 +302,22 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ] else ...[
-            // Nút Đăng ký + Đăng nhập khi chưa đăng nhập
             _HeaderButton(
-              label: "Đăng ký",
+              label: 'Đăng ký',
+              filled: false,
               onTap: () async {
                 await Navigator.of(context).pushNamed('/register');
                 _checkLoginState();
               },
-              filled: false,
             ),
             const SizedBox(width: 8),
             _HeaderButton(
-              label: "Đăng nhập",
+              label: 'Đăng nhập',
+              filled: true,
               onTap: () async {
                 await Navigator.of(context).pushNamed('/login');
                 _checkLoginState();
               },
-              filled: true,
             ),
           ],
         ],
@@ -307,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onSubmitted: _onSearch,
           style: const TextStyle(color: AppColors.textDark, fontSize: 14),
           decoration: InputDecoration(
-            hintText: "Tìm tên sách, tác giả...",
+            hintText: 'Tìm tên sách, tác giả...',
             hintStyle: const TextStyle(
               color: AppColors.textLight,
               fontSize: 14,
@@ -317,17 +355,30 @@ class _HomeScreenState extends State<HomeScreen> {
               color: AppColors.textLight,
               size: 20,
             ),
-            suffixIcon: IconButton(
-              icon: const Icon(
-                Icons.tune_rounded,
-                color: AppColors.accent,
-                size: 20,
-              ),
-              onPressed: () {},
-            ),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(
+                      Icons.clear_rounded,
+                      color: AppColors.textLight,
+                      size: 18,
+                    ),
+                    onPressed: () {
+                      _searchController.clear();
+                      _onGenreSelected(_selectedGenre);
+                    },
+                  )
+                : IconButton(
+                    icon: const Icon(
+                      Icons.tune_rounded,
+                      color: AppColors.accent,
+                      size: 20,
+                    ),
+                    onPressed: () {},
+                  ),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 14),
           ),
+          onChanged: (_) => setState(() {}),
         ),
       ),
     );
@@ -371,7 +422,24 @@ class _HomeScreenState extends State<HomeScreen> {
   SliverGrid _buildBookGrid(List<BookModel> books) {
     return SliverGrid(
       delegate: SliverChildBuilderDelegate(
-        (context, index) => _BookCard(book: books[index]),
+        (context, index) => _BookCard(
+          book: books[index],
+          isSaved: _savedBookIds.contains(books[index].bookId),
+          onToggleSave: () => _toggleSave(books[index]),
+
+          onTapDetail: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => BookDetailScreen(
+                  bookId: books[index].bookId,
+                  heroTag: 'book_${books[index].bookId}',
+                ),
+              ),
+            );
+            _loadSavedIds();
+          },
+        ),
         childCount: books.length,
       ),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -379,6 +447,31 @@ class _HomeScreenState extends State<HomeScreen> {
         childAspectRatio: 0.58,
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      height: 200,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.search_off_rounded,
+              color: AppColors.textLight,
+              size: 48,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _selectedGenre == 'Tất cả'
+                  ? 'Không tìm thấy sách nào.'
+                  : 'Không có sách thể loại "$_selectedGenre".',
+              style: const TextStyle(color: AppColors.textMid),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -398,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Icon(Icons.wifi_off_rounded, color: Colors.red.shade300, size: 40),
           const SizedBox(height: 12),
           const Text(
-            "Không thể tải dữ liệu",
+            'Không thể tải dữ liệu',
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: AppColors.textDark,
@@ -406,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            "Kiểm tra kết nối và thử lại",
+            'Kiểm tra kết nối và thử lại',
             style: TextStyle(fontSize: 12, color: AppColors.textLight),
           ),
           const SizedBox(height: 16),
@@ -414,7 +507,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () =>
                 setState(() => _futureBooks = _bookService.fetchBooks()),
             child: const Text(
-              "Thử lại",
+              'Thử lại',
               style: TextStyle(color: AppColors.accent),
             ),
           ),
@@ -434,7 +527,6 @@ class _HeaderButton extends StatelessWidget {
     required this.onTap,
     required this.filled,
   });
-
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
@@ -459,23 +551,24 @@ class _HeaderButton extends StatelessWidget {
   );
 }
 
-// ── BOOK CARD ─────────────────────────────────────────────────────────
+// ── BOOK CARD — nhận isSaved + callbacks ──────────────────────────────
 class _BookCard extends StatelessWidget {
   final BookModel book;
-  const _BookCard({required this.book});
+  final bool isSaved;
+  final VoidCallback onToggleSave;
+  final VoidCallback onTapDetail;
+
+  const _BookCard({
+    required this.book,
+    required this.isSaved,
+    required this.onToggleSave,
+    required this.onTapDetail,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BookDetailScreen(
-            bookId: book.bookId,
-            heroTag: 'book_${book.bookId}',
-          ),
-        ),
-      ),
+      onTap: onTapDetail,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -491,6 +584,7 @@ class _BookCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Cover ───────────────────────────────────────────────
             Expanded(
               flex: 5,
               child: ClipRRect(
@@ -507,6 +601,7 @@ class _BookCard extends StatelessWidget {
                             errorBuilder: (_, __, ___) => _placeholder(),
                           )
                         : _placeholder(),
+                    // Rating badge
                     if (book.rating != null)
                       Positioned(
                         top: 8,
@@ -545,6 +640,8 @@ class _BookCard extends StatelessWidget {
                 ),
               ),
             ),
+
+            // ── Info ─────────────────────────────────────────────────
             Expanded(
               flex: 3,
               child: Padding(
@@ -595,19 +692,29 @@ class _BookCard extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
+                    // ── Bookmark button — hiện đúng trạng thái ─────────
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: AppColors.chip,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.bookmark_border_rounded,
-                            size: 15,
-                            color: AppColors.textMid,
+                        GestureDetector(
+                          onTap: onToggleSave,
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: isSaved
+                                  ? AppColors.accentL
+                                  : AppColors.chip,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isSaved
+                                  ? Icons.bookmark_rounded
+                                  : Icons.bookmark_border_rounded,
+                              size: 15,
+                              color: isSaved
+                                  ? AppColors.accent
+                                  : AppColors.textMid,
+                            ),
                           ),
                         ),
                       ],

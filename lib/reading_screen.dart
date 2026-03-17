@@ -1,13 +1,14 @@
-import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
+// lib/reading_screen.dart
+// ── FIX: xóa import dart:io và http không dùng ──────────────────────
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:librarybookshelf/models/reading_screen_model.dart';
+import 'package:librarybookshelf/models/user_stats_model.dart';
 import 'package:librarybookshelf/services/reading_progress_service.dart';
 import 'package:librarybookshelf/services/reading_service.dart';
 import 'package:librarybookshelf/services/auther_service.dart';
+import 'package:librarybookshelf/theme/app_theme.dart';
 
 class ReadingScreen extends StatefulWidget {
   final int bookId;
@@ -34,7 +35,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
   List<ChapterListItem> _chapterList = [];
   ChapterContent? _currentContent;
   bool _isLoading = true;
-  bool _isEndOfBook = false; // hết chương hiện có
+  bool _isEndOfBook = false;
 
   double _fontSize = 16.0;
   bool _isDarkMode = false;
@@ -77,7 +78,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
       await _loadChapterContent(_currentChapter);
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnack("Lỗi tải dữ liệu: $e");
+      _showSnack('Lỗi tải dữ liệu: $e');
     }
   }
 
@@ -94,11 +95,9 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
   Future<void> _loadChapterContent(int chapterNumber) async {
     try {
-      // Thử lấy nội dung chương từ API (cần token)
       final content = await _service.fetchChapter(widget.bookId, chapterNumber);
 
       if (content == null) {
-        // 204 NoContent = hết chương hiện có trong DB
         setState(() {
           _isEndOfBook = true;
           _isLoading = false;
@@ -115,18 +114,184 @@ class _ReadingScreenState extends State<ReadingScreen> {
         _showSettings = false;
       });
 
-      // Lưu tiến trình lên server
+      // Lưu tiến trình + xử lý gamification
       await _saveProgress(chapterNumber);
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnack("Lỗi tải chương: $e");
+      _showSnack('Lỗi tải chương: $e');
     }
   }
 
   Future<void> _saveProgress(int chapter) async {
-    await ReadingProgressService.saveProgress(
+    final result = await ReadingProgressService.saveProgress(
       bookId: widget.bookId,
       currentChapter: chapter,
+    );
+
+    // ── Hiện popup nếu có reward mới ────────────────────────────────
+    if (result.hasReward && mounted) {
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (mounted) _showRewardPopup(result.gamification!);
+    }
+  }
+
+  // ── Popup thông báo badge/rank/hoàn thành sách ───────────────────
+  void _showRewardPopup(GamificationResultModel gam) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Sách hoàn thành ──────────────────────────────────────
+            if (gam.bookJustCompleted) ...[
+              const Text('🎉', style: TextStyle(fontSize: 40)),
+              const SizedBox(height: 8),
+              Text(
+                'Hoàn thành sách!',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: _textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Bạn đã đọc ≥70% — cuốn sách này được tính vào thư viện',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: _textSub),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // ── Lên rank ────────────────────────────────────────────
+            if (gam.newRank != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: _accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _accent.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('👑', style: TextStyle(fontSize: 20)),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Lên cấp!',
+                          style: TextStyle(fontSize: 11, color: _textSub),
+                        ),
+                        Text(
+                          gam.newRank!,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: _accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // ── Badges mới ──────────────────────────────────────────
+            if (gam.newBadges.isNotEmpty) ...[
+              Text(
+                'Huy hiệu mới!',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: gam.newBadges
+                    .map(
+                      (b) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _accent.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _accent.withOpacity(0.25)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(b.icon, style: const TextStyle(fontSize: 18)),
+                            const SizedBox(width: 6),
+                            Text(
+                              b.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // ── Streak ──────────────────────────────────────────────
+            if (gam.currentStreak > 1)
+              Text(
+                '🔥 Streak: ${gam.currentStreak} ngày liên tiếp',
+                style: TextStyle(fontSize: 13, color: _textSub),
+              ),
+
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1C1712),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Tiếp tục đọc',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -160,7 +325,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
       );
     }
 
-    // ── Hết chương hiện có ──────────────────────────────────────────
     if (_isEndOfBook) {
       return Scaffold(
         backgroundColor: _bg,
@@ -199,13 +363,13 @@ class _ReadingScreenState extends State<ReadingScreen> {
                   ),
                   child: const Icon(
                     Icons.menu_book_rounded,
-                    color: Color(0xFFD4A853),
+                    color: _accent,
                     size: 40,
                   ),
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  "Hết nội dung hiện có",
+                  'Hết nội dung hiện có',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -214,7 +378,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  "Bạn đã đọc đến chương $_currentChapter.\nNội dung các chương tiếp theo chưa được cập nhật.\nVui lòng quay lại sau!",
+                  'Bạn đã đọc đến chương $_currentChapter.\nNội dung tiếp theo chưa được cập nhật.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: _textSub, height: 1.6),
                 ),
@@ -233,7 +397,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     elevation: 0,
                   ),
                   child: const Text(
-                    "Quay về",
+                    'Quay về',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -290,7 +454,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "CHƯƠNG ${chapter.chapterNumber}",
+          'CHƯƠNG ${chapter.chapterNumber}',
           style: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w800,
@@ -313,7 +477,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
         const SizedBox(height: 8),
         if (chapter.wordCount != null)
           Text(
-            "${chapter.wordCount} từ  ·  ~${((chapter.wordCount ?? 0) / 200).ceil()} phút đọc",
+            '${chapter.wordCount} từ  ·  ~${((chapter.wordCount ?? 0) / 200).ceil()} phút đọc',
             style: TextStyle(fontSize: 12, color: _textSub),
           ),
         const SizedBox(height: 28),
@@ -370,7 +534,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
           ),
           _ChapterNavBtn(
             icon: Icons.chevron_left_rounded,
-            label: "Trước",
+            label: 'Trước',
             enabled: _currentChapter > 1,
             onTap: () => _loadChapter(_currentChapter - 1),
             textColor: _textPrimary,
@@ -398,7 +562,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "Ch.$_currentChapter/$_totalChapters",
+                        'Ch.$_currentChapter/$_totalChapters',
                         style: TextStyle(fontSize: 11, color: _textSub),
                       ),
                       const SizedBox(width: 4),
@@ -415,7 +579,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
           ),
           _ChapterNavBtn(
             icon: Icons.chevron_right_rounded,
-            label: "Sau",
+            label: 'Sau',
             enabled: _currentChapter < _totalChapters,
             onTap: () => _loadChapter(_currentChapter + 1),
             textColor: _textPrimary,
@@ -441,13 +605,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
       decoration: BoxDecoration(
         color: _surface.withOpacity(0.97),
         border: Border(top: BorderSide(color: _border, width: 1)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(_isDarkMode ? 0.3 : 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -455,7 +612,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
           Row(
             children: [
               Text(
-                "${(_progressValue * 100).toInt()}%",
+                '${(_progressValue * 100).toInt()}%',
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -476,7 +633,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
               ),
               const SizedBox(width: 10),
               Text(
-                "Ch.$_currentChapter/$_totalChapters",
+                'Ch.$_currentChapter/$_totalChapters',
                 style: TextStyle(fontSize: 11, color: _textSub),
               ),
             ],
@@ -493,7 +650,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
               child: Row(
                 children: [
                   Text(
-                    "Giao diện",
+                    'Giao diện',
                     style: TextStyle(fontSize: 12, color: _textSub),
                   ),
                   const SizedBox(width: 10),
@@ -501,7 +658,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     onTap: () => setState(() => _isDarkMode = false),
                     child: _ModeBtn(
                       icon: Icons.light_mode_rounded,
-                      label: "Sáng",
+                      label: 'Sáng',
                       active: !_isDarkMode,
                       activeColor: _accent,
                       textColor: _textPrimary,
@@ -513,7 +670,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     onTap: () => setState(() => _isDarkMode = true),
                     child: _ModeBtn(
                       icon: Icons.dark_mode_rounded,
-                      label: "Tối",
+                      label: 'Tối',
                       active: _isDarkMode,
                       activeColor: _accent,
                       textColor: _textPrimary,
@@ -522,7 +679,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                   ),
                   const Spacer(),
                   Text(
-                    "Cỡ chữ",
+                    'Cỡ chữ',
                     style: TextStyle(fontSize: 12, color: _textSub),
                   ),
                   const SizedBox(width: 10),
@@ -537,7 +694,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    "${_fontSize.toInt()}",
+                    '${_fontSize.toInt()}',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -587,7 +744,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Text(
-                  "Hết chương $_currentChapter",
+                  'Hết chương $_currentChapter',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -606,10 +763,10 @@ class _ReadingScreenState extends State<ReadingScreen> {
           if (!hasNext)
             Column(
               children: [
-                const Text("🎉", style: TextStyle(fontSize: 32)),
+                const Text('🎉', style: TextStyle(fontSize: 32)),
                 const SizedBox(height: 8),
                 Text(
-                  "Bạn đã đọc xong cuốn sách!",
+                  'Bạn đã đọc xong cuốn sách!',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -626,7 +783,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     ),
                   ),
                   child: const Text(
-                    "Quay về",
+                    'Quay về',
                     style: TextStyle(
                       color: _accent,
                       fontWeight: FontWeight.w600,
@@ -669,7 +826,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "Chương ${_currentChapter + 1}",
+                            'Chương ${_currentChapter + 1}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
@@ -717,7 +874,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
             child: Row(
               children: [
                 Text(
-                  "Danh sách chương",
+                  'Danh sách chương',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -726,7 +883,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                 ),
                 const Spacer(),
                 Text(
-                  "$_totalChapters chương",
+                  '$_totalChapters chương',
                   style: TextStyle(fontSize: 12, color: _textSub),
                 ),
               ],
@@ -754,7 +911,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        "${ch.chapterNumber}",
+                        '${ch.chapterNumber}',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -764,7 +921,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     ),
                   ),
                   title: Text(
-                    ch.chapterTitle ?? "Chương ${ch.chapterNumber}",
+                    ch.chapterTitle ?? 'Chương ${ch.chapterNumber}',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
@@ -773,7 +930,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                   ),
                   subtitle: ch.wordCount != null
                       ? Text(
-                          "${ch.wordCount} từ",
+                          '${ch.wordCount} từ',
                           style: TextStyle(fontSize: 11, color: _textSub),
                         )
                       : null,
@@ -824,8 +981,7 @@ class _ChapterNavBtn extends StatelessWidget {
   final bool enabled;
   final bool isNext;
   final VoidCallback onTap;
-  final Color textColor;
-  final Color border;
+  final Color textColor, border;
   final bool isDark;
   const _ChapterNavBtn({
     required this.icon,
@@ -889,9 +1045,7 @@ class _ModeBtn extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool active;
-  final Color activeColor;
-  final Color textColor;
-  final Color border;
+  final Color activeColor, textColor, border;
   const _ModeBtn({
     required this.icon,
     required this.label,
@@ -935,8 +1089,7 @@ class _FontBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool enabled;
-  final Color border;
-  final Color textColor;
+  final Color border, textColor;
   const _FontBtn({
     required this.icon,
     required this.onTap,

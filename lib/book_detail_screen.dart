@@ -12,9 +12,6 @@ import 'package:librarybookshelf/reading_screen.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
 import 'package:librarybookshelf/services/user_library_service.dart';
 
-//new
-import 'package:librarybookshelf/services/user_library_service.dart';
-
 class BookDetailScreen extends StatefulWidget {
   final int bookId;
   final String? heroTag;
@@ -26,12 +23,10 @@ class BookDetailScreen extends StatefulWidget {
 
 class _BookDetailScreenState extends State<BookDetailScreen> {
   final _service = BookDetailService();
-  
   final _libraryService = UserLibraryService();
 
   late Future<BookDetail> _futureDetail;
 
-  // State
   bool _isSaved = false;
   bool _isDownloading = false;
   double _downloadProgress = 0;
@@ -42,20 +37,30 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   void initState() {
     super.initState();
     _futureDetail = _service.fetchDetail(widget.bookId);
-    _loadReadingProgress();
+    _loadInitialState(); // ── FIX: gộp 2 lần gọi vào 1
   }
 
-  // Thêm hàm này
-  Future<void> _checkInitialSavedState() async {
+  // ── FIX: gọi cả checkSaved lẫn loadProgress cùng lúc ────────────
+  Future<void> _loadInitialState() async {
     final loggedIn = await AuthService.isLoggedIn();
-    if (loggedIn) {
-      final isSaved = await _libraryService.checkIsSaved(widget.bookId);
-      if (mounted) {
-        setState(() {
-          _isSaved = isSaved;
-        });
-      }
-    }
+    if (!loggedIn) return;
+
+    // Chạy song song
+    final results = await Future.wait([
+      _libraryService.checkIsSaved(widget.bookId),
+      ReadingProgressService.getProgress(widget.bookId),
+    ]);
+
+    if (!mounted) return;
+
+    final isSaved = results[0] as bool;
+    final progress = results[1] as Map<String, dynamic>?;
+
+    setState(() {
+      _isSaved = isSaved;
+      _hasStartedReading = progress?['hasProgress'] == true;
+      _savedChapter = progress?['currentChapter'] ?? 1;
+    });
   }
 
   Future<void> _loadReadingProgress() async {
@@ -71,43 +76,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     }
   }
 
-  // void _toggleSave(BookDetail book) {
-  //   setState(() => _isSaved = !_isSaved);
-  //   AppSnack.show(
-  //     context,
-  //     _isSaved ? "Đã lưu \"${book.title}\"" : "Đã bỏ lưu \"${book.title}\"",
-  //     isSuccess: _isSaved,
-  //   );
-  // }
-  // Sửa lại hàm _toggleSave
   Future<void> _toggleSave(BookDetail book) async {
     final loggedIn = await AuthService.isLoggedIn();
-    if (!loggedIn) {
-      showLoginRequiredDialog(
-        context: context,
-        onLogin: () => Navigator.of(context).pushNamed('/login'),
-      );
-      return;
-    }
-
-    try {
-      final isNowSaved = await _libraryService.toggleSaveBook(book.bookId);
-      setState(() {
-        _isSaved = isNowSaved;
-      });
-      AppSnack.show(
-        context,
-        _isSaved ? "Đã lưu \"${book.title}\"" : "Đã bỏ lưu \"${book.title}\"",
-        isSuccess: _isSaved,
-      );
-    } catch (e) {
-      AppSnack.show(context, "Lỗi: $e", isError: true);
-    }
-  }
-
-  Future<void> _startReading(BookDetail book) async {
-    final loggedIn = await AuthService.isLoggedIn();
-
     if (!loggedIn) {
       if (!mounted) return;
       showLoginRequiredDialog(
@@ -117,29 +87,53 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       return;
     }
 
-    if (mounted) {
-      Navigator.push(
+    try {
+      final isNowSaved = await _libraryService.toggleSaveBook(book.bookId);
+      if (!mounted) return;
+      setState(() => _isSaved = isNowSaved);
+      AppSnack.show(
         context,
-        MaterialPageRoute(
-          builder: (_) => ReadingScreen(
-            bookId: book.bookId,
-            bookTitle: book.title,
-            initialChapter: _savedChapter,
-          ),
-        ),
-      ).then((_) => _loadReadingProgress());
+        _isSaved ? 'Đã lưu "${book.title}"' : 'Đã bỏ lưu "${book.title}"',
+        isSuccess: _isSaved,
+      );
+    } catch (e) {
+      if (mounted) AppSnack.show(context, 'Lỗi: $e', isError: true);
     }
+  }
+
+  Future<void> _startReading(BookDetail book) async {
+    final loggedIn = await AuthService.isLoggedIn();
+    if (!loggedIn) {
+      if (!mounted) return;
+      showLoginRequiredDialog(
+        context: context,
+        onLogin: () => Navigator.of(context).pushNamed('/login'),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReadingScreen(
+          bookId: book.bookId,
+          bookTitle: book.title,
+          initialChapter: _savedChapter,
+        ),
+      ),
+    ).then((_) => _loadReadingProgress());
   }
 
   Future<void> _download(BookDetail book) async {
     if (book.fileUrl == null || book.fileUrl!.isEmpty) {
-      AppSnack.show(context, "Sách này chưa có file để tải về", isError: true);
+      AppSnack.show(context, 'Sách này chưa có file để tải về', isError: true);
       return;
     }
     if (kIsWeb) {
       AppSnack.show(
         context,
-        "Tính năng tải về chỉ hỗ trợ trên mobile",
+        'Tính năng tải về chỉ hỗ trợ trên mobile',
         isError: true,
       );
       return;
@@ -169,14 +163,17 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       final ext = book.fileUrl!.split('.').last;
       final fileName = '${book.bookId}_${book.title.replaceAll(' ', '_')}.$ext';
       await File('${dir.path}/$fileName').writeAsBytes(bytes);
-      AppSnack.show(context, "Đã tải về: $fileName", isSuccess: true);
+
+      if (mounted)
+        AppSnack.show(context, 'Đã tải về: $fileName', isSuccess: true);
     } catch (e) {
-      AppSnack.show(context, "Tải về thất bại: $e", isError: true);
+      if (mounted) AppSnack.show(context, 'Tải về thất bại: $e', isError: true);
     } finally {
-      setState(() {
-        _isDownloading = false;
-        _downloadProgress = 0;
-      });
+      if (mounted)
+        setState(() {
+          _isDownloading = false;
+          _downloadProgress = 0;
+        });
     }
   }
 
@@ -208,7 +205,6 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         }
 
         final book = snapshot.data!;
-
         return BookDetailView(
           book: book,
           heroTag: widget.heroTag,

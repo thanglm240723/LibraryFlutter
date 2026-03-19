@@ -76,7 +76,7 @@ class _LoginPageState extends State<LoginPage>
       );
       // Kiểm tra nếu là admin
       final isAdmin = data['role'] == 'admin';
-      final route = isAdmin ? '/admin-profile' : '/home';
+      final route = isAdmin ? '/admin-home' : '/home';
       Navigator.of(context).pushReplacementNamed(route);
     } else {
       AppSnack.show(context, "Sai tên đăng nhập hoặc mật khẩu", isError: true);

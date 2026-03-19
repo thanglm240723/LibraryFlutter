@@ -4,6 +4,7 @@ import 'home_screen.dart';
 import 'register_page.dart';
 import 'profile_screen.dart';
 import 'admin/screens/admin_profile_screen.dart';
+import 'admin/screens/admin_home_screen.dart';
 import 'admin/screens/admin_book_list_screen.dart';
 import 'services/auther_service.dart';
 import 'dart:io';
@@ -35,7 +36,7 @@ class _MyAppState extends State<MyApp> {
     if (isLoggedIn) {
       final role = await AuthService.getRole();
       setState(() {
-        _initialRoute = role == 'admin' ? '/admin-profile' : '/home';
+        _initialRoute = role == 'admin' ? '/admin-home' : '/home';
         _isCheckingRoute = false;
       });
     } else {
@@ -71,6 +72,7 @@ class _MyAppState extends State<MyApp> {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/home': (context) => const HomeScreen(),
+        '/admin-home': (context) => const AdminHomeScreen(),
         '/admin-profile': (context) => const AdminProfileScreen(),
         
       },
@@ -78,8 +80,8 @@ class _MyAppState extends State<MyApp> {
   }
 
   Widget _buildInitialScreen() {
-    if (_initialRoute == '/admin-profile') {
-      return const AdminProfileScreen();
+    if (_initialRoute == '/admin-home') {
+      return const AdminHomeScreen();
     } else if (_initialRoute == '/home') {
       return const HomeScreen();
     } else {

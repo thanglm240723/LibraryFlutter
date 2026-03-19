@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AuthService {
   static String get baseUrl {
     if (kIsWeb) return "https://localhost:7094/api/Auth";
-    if (Platform.isAndroid) return "https://10.0.2.2:7094/api/Auth";
+    if (Platform.isAndroid) return "http://10.0.2.2:7094/api/Auth";
     return "https://localhost:7094/api/Auth";
   }
 

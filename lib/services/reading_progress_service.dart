@@ -59,6 +59,35 @@ class ReadingProgressService {
       return SaveProgressResult(success: false);
     }
   }
+
+  static Future<List<dynamic>> getReadingHistory() async {
+    try {
+      final headers = await AuthService.authHeaders();
+      final res = await http.get(
+        Uri.parse('$baseUrl/history'),
+        headers: headers,
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body);
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  static Future<List<dynamic>> getBookmarks() async {
+    try {
+      final headers = await AuthService.authHeaders();
+      final res = await http.get(
+        Uri.parse('$baseUrl/bookmarks'),
+        headers: headers,
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body);
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+  
 }
 
 class SaveProgressResult {

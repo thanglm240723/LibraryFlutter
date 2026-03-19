@@ -6,6 +6,7 @@ import 'package:librarybookshelf/services/profile_service.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
 import 'package:librarybookshelf/saved_books_screen.dart';
 import 'package:librarybookshelf/leaderboard_screen.dart';
+import 'package:librarybookshelf/reading_history_screen.dart'; // Thêm dòng này
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -818,11 +819,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           // ── Lịch sử đọc — không code màn mới ────────────
+                          // _MenuItem(
+                          //   icon: Icons.history_rounded,
+                          //   label: 'Lịch sử đọc',
+                          //   sub: 'Các phiên đọc gần đây',
+                          //   onTap: _showReadingHistory,
+                          // ),
                           _MenuItem(
                             icon: Icons.history_rounded,
-                            label: 'Lịch sử đọc',
-                            sub: 'Các phiên đọc gần đây',
-                            onTap: _showReadingHistory,
+                            label: 'Lịch sử & Dấu trang',
+                            sub: 'Tiến trình và trang đang lưu',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const ReadingHistoryScreen(), // Sẽ tạo màn hình này ở Bước 3
+                                ),
+                              );
+                            },
                           ),
                           _MenuItem(
                             icon: Icons.leaderboard_rounded,

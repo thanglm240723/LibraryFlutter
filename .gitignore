@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment configuration files (keep secret credentials out of version control)
+.env
+.env.local
+.env.*.local

@@ -8,7 +8,7 @@ import 'package:librarybookshelf/models/book_detail_model.dart';
 class BookDetailService {
   String get _base {
     if (kIsWeb) return "https://localhost:7094/api/Books";
-    if (Platform.isAndroid) return "https://10.0.2.2:7094/api/Books";
+    if (defaultTargetPlatform == TargetPlatform.android) return "https://10.0.2.2:7094/api/Books";
     return "https://localhost:7094/api/Books";
   }
 

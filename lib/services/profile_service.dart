@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ProfileService {
   static String get baseUrl {
     if (kIsWeb) return 'https://localhost:7094/api/Profile';
-    if (Platform.isAndroid) return 'https://10.0.2.2:7094/api/Profile';
+    if (defaultTargetPlatform == TargetPlatform.android) return 'https://10.0.2.2:7094/api/Profile';
     return 'https://localhost:7094/api/Profile';
   }
 

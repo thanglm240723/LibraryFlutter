@@ -9,7 +9,7 @@ import 'package:librarybookshelf/services/auther_service.dart';
 class ReadingService {
   String get _base {
     if (kIsWeb) return "https://localhost:7094/api/Books";
-    if (!kIsWeb && Platform.isAndroid) return "https://10.0.2.2:7094/api/Books";
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) return "https://10.0.2.2:7094/api/Books";
     return "https://localhost:7094/api/Books";
   }
 

@@ -6,10 +6,19 @@ import 'profile_screen.dart';
 import 'admin/screens/admin_profile_screen.dart';
 import 'admin/screens/admin_book_list_screen.dart';
 import 'services/auther_service.dart';
+import 'services/env_loader.dart';
+import 'services/firebase_config.dart';
 import 'dart:io';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize environment variables from .env file
+  await EnvLoader.initialize();
+
+  // Initialize Firebase
+  await FirebaseConfig.initialize();
+
   runApp(const MyApp());
 }
 
@@ -72,7 +81,6 @@ class _MyAppState extends State<MyApp> {
         '/register': (context) => const RegisterPage(),
         '/home': (context) => const HomeScreen(),
         '/admin-profile': (context) => const AdminProfileScreen(),
-        
       },
     );
   }

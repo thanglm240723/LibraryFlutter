@@ -9,7 +9,7 @@ class UserLibraryService {
   String get baseUrl {
     if (kIsWeb) {
       return "https://localhost:7094/api/UserLibrary";
-    } else if (Platform.isAndroid) {
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
       return "https://10.0.2.2:7094/api/UserLibrary"; 
     } else {
       return "https://localhost:7094/api/UserLibrary";

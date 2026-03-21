@@ -10,7 +10,7 @@ import 'package:librarybookshelf/services/auther_service.dart';
 class UserStatsService {
   static String get baseUrl {
     if (kIsWeb) return 'https://localhost:7094/api/UserStats';
-    if (Platform.isAndroid) return 'https://10.0.2.2:7094/api/UserStats';
+    if (defaultTargetPlatform == TargetPlatform.android) return 'https://10.0.2.2:7094/api/UserStats';
     return 'https://localhost:7094/api/UserStats';
   }
 

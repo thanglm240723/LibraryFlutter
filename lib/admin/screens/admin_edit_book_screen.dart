@@ -1,5 +1,8 @@
+// Removed dart:io import
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:librarybookshelf/admin/services/admin_book_service.dart';
+import 'package:librarybookshelf/services/firebase_storage_service.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
 
 class AdminEditBookScreen extends StatefulWidget {
@@ -16,15 +19,15 @@ class _AdminEditBookScreenState extends State<AdminEditBookScreen> {
   final _titleController = TextEditingController();
   final _authorController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _coverImageUrlController = TextEditingController();
   final _genreController = TextEditingController();
   final _pageCountController = TextEditingController();
   final _publishedYearController = TextEditingController();
-  final _ratingController = TextEditingController();
   final _languageController = TextEditingController();
   final _fileUrlController = TextEditingController();
 
   bool _isLoading = false;
+  bool _isUploadingImage = false;
+  late String _coverImageUrl;
 
   @override
   void initState() {
@@ -36,15 +39,12 @@ class _AdminEditBookScreenState extends State<AdminEditBookScreen> {
     _titleController.text = widget.book['title'] ?? '';
     _authorController.text = widget.book['author'] ?? '';
     _descriptionController.text = widget.book['description'] ?? '';
-    _coverImageUrlController.text = widget.book['coverImageUrl'] ?? '';
+    _coverImageUrl = widget.book['coverImageUrl'] ?? '';
     _genreController.text = widget.book['genre'] ?? '';
     _pageCountController.text = (widget.book['pageCount'] ?? '')
         .toString()
         .replaceAll('null', '');
     _publishedYearController.text = (widget.book['publishedYear'] ?? '')
-        .toString()
-        .replaceAll('null', '');
-    _ratingController.text = (widget.book['rating'] ?? '')
         .toString()
         .replaceAll('null', '');
     _languageController.text = widget.book['language'] ?? '';
@@ -56,41 +56,103 @@ class _AdminEditBookScreenState extends State<AdminEditBookScreen> {
     _titleController.dispose();
     _authorController.dispose();
     _descriptionController.dispose();
-    _coverImageUrlController.dispose();
     _genreController.dispose();
     _pageCountController.dispose();
     _publishedYearController.dispose();
-    _ratingController.dispose();
     _languageController.dispose();
     _fileUrlController.dispose();
     super.dispose();
   }
 
-  InputDecoration _buildInputDecoration(
-    String label,
-    String hint,
-    IconData icon,
-  ) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      labelStyle: const TextStyle(color: AppColors.textMid),
-      hintStyle: const TextStyle(color: AppColors.textLight),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+  Future<void> _pickImage() async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+      if (pickedFile != null) {
+        setState(() {
+          _isUploadingImage = true;
+        });
+        await Future.delayed(const Duration(milliseconds: 100)); // Yield to renderer
+
+        try {
+          final fileBytes = await pickedFile.readAsBytes();
+          final oldUrl = _coverImageUrl;
+          _coverImageUrl = await FirebaseStorageService.uploadCoverImage(
+            fileBytes,
+            pickedFile.name,
+            widget.book['bookId'] as int,
+          );
+
+          // Delete old image if it exists
+          if (oldUrl.isNotEmpty) {
+            await FirebaseStorageService.deleteImage(oldUrl);
+          }
+
+          if (mounted) {
+            setState(() {
+              _isUploadingImage = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Upload ảnh thành công'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _isUploadingImage = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi chọn ảnh: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _buildModernTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      decoration: AppDecorations.inputField,
+      child: TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        validator: validator,
+        style: const TextStyle(color: AppColors.textDark, fontSize: 14),
+        decoration: InputDecoration(
+          hoverColor: Colors.transparent,
+          labelText: label,
+          hintText: hint,
+          labelStyle: const TextStyle(color: AppColors.textMid, fontSize: 13),
+          floatingLabelStyle: const TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
+          hintStyle: const TextStyle(color: AppColors.textLight, fontSize: 13),
+          prefixIcon: Icon(icon, color: AppColors.textLight, size: 20),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.accent, width: 2),
-      ),
-      prefixIcon: Icon(icon, color: AppColors.accent),
-      filled: true,
-      fillColor: AppColors.surface,
     );
   }
 
@@ -111,9 +173,7 @@ class _AdminEditBookScreenState extends State<AdminEditBookScreen> {
         description: _descriptionController.text.isEmpty
             ? null
             : _descriptionController.text,
-        coverImageUrl: _coverImageUrlController.text.isEmpty
-            ? null
-            : _coverImageUrlController.text,
+        coverImageUrl: _coverImageUrl.isEmpty ? null : _coverImageUrl,
         genre: _genreController.text.isEmpty ? null : _genreController.text,
         pageCount: _pageCountController.text.isEmpty
             ? null
@@ -121,9 +181,6 @@ class _AdminEditBookScreenState extends State<AdminEditBookScreen> {
         publishedYear: _publishedYearController.text.isEmpty
             ? null
             : int.tryParse(_publishedYearController.text),
-        rating: _ratingController.text.isEmpty
-            ? null
-            : double.tryParse(_ratingController.text),
         language: _languageController.text.isEmpty
             ? null
             : _languageController.text,
@@ -168,7 +225,7 @@ class _AdminEditBookScreenState extends State<AdminEditBookScreen> {
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text(
-          'Chỉnh Sửa Sách',
+          'Chỉnh sửa sách',
           style: TextStyle(
             color: AppColors.textDark,
             fontWeight: FontWeight.bold,
@@ -189,187 +246,174 @@ class _AdminEditBookScreenState extends State<AdminEditBookScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    if (widget.book['coverImageUrl'] != null &&
-                        (widget.book['coverImageUrl'] as String).isNotEmpty)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            widget.book['coverImageUrl'],
-                            height: 200,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                                  height: 200,
-                                  color: AppColors.chip,
-                                  child: const Icon(
-                                    Icons.image_not_supported,
-                                    color: AppColors.textLight,
-                                  ),
-                                ),
+                    // Image Preview Section - Interactive
+                    GestureDetector(
+                      onTap: _isUploadingImage ? null : _pickImage,
+                      child: Container(
+                        width: double.infinity,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _coverImageUrl.isNotEmpty
+                                ? AppColors.accent
+                                : AppColors.border,
+                            width: 2,
                           ),
+                          borderRadius: BorderRadius.circular(8),
+                          color: AppColors.chip,
                         ),
+                        child: _isUploadingImage
+                            ? const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    CircularProgressIndicator(
+                                      color: AppColors.accent,
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : _coverImageUrl.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(7),
+                                child: Image.network(
+                                  _coverImageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Center(
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.image_not_supported,
+                                              size: 40,
+                                              color: AppColors.textLight,
+                                            ),
+                                            const SizedBox(height: 8),
+                                            const Text(
+                                              'Nhấn để tải lên ảnh mới',
+                                              style: TextStyle(
+                                                color: AppColors.textMid,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                ),
+                              )
+                            : Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.cloud_upload_outlined,
+                                      size: 40,
+                                      color: AppColors.accent,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'Nhấn để tải lên ảnh bìa',
+                                      style: TextStyle(
+                                        color: AppColors.textMid,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                       ),
-                    TextFormField(
+                    ),
+                    const SizedBox(height: 24),
+                    _buildModernTextField(
                       controller: _titleController,
-                      decoration: _buildInputDecoration(
-                        'Tiêu đề *',
-                        'Nhập tiêu đề sách',
-                        Icons.title,
-                      ),
-                      style: const TextStyle(color: AppColors.textDark),
+                      label: 'Tiêu đề *',
+                      hint: 'Nhập tiêu đề sách',
+                      icon: Icons.title,
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Tiêu đề không được để trống';
-                        }
-                        if (value.length > 255) {
-                          return 'Tiêu đề không vượt quá 255 ký tự';
-                        }
+                        if (value == null || value.isEmpty) return 'Tiêu đề không được để trống';
+                        if (value.length > 255) return 'Tiêu đề không vượt quá 255 ký tự';
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
+                    _buildModernTextField(
                       controller: _authorController,
-                      decoration: _buildInputDecoration(
-                        'Tác giả *',
-                        'Nhập tác giả',
-                        Icons.person,
-                      ),
-                      style: const TextStyle(color: AppColors.textDark),
+                      label: 'Tác giả *',
+                      hint: 'Nhập tác giả',
+                      icon: Icons.person,
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Tác giả không được để trống';
-                        }
-                        if (value.length > 100) {
-                          return 'Tác giả không vượt quá 100 ký tự';
-                        }
+                        if (value == null || value.isEmpty) return 'Tác giả không được để trống';
+                        if (value.length > 100) return 'Tác giả không vượt quá 100 ký tự';
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
+                    _buildModernTextField(
                       controller: _descriptionController,
-                      decoration: _buildInputDecoration(
-                        'Mô tả',
-                        'Nhập mô tả sách',
-                        Icons.description,
-                      ),
-                      style: const TextStyle(color: AppColors.textDark),
+                      label: 'Mô tả',
+                      hint: 'Nhập mô tả sách',
+                      icon: Icons.description,
                       maxLines: 4,
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _coverImageUrlController,
-                      decoration: _buildInputDecoration(
-                        'URL Hình ảnh bìa',
-                        'https://example.com/cover.jpg',
-                        Icons.image,
-                      ),
-                      style: const TextStyle(color: AppColors.textDark),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
+                    _buildModernTextField(
                       controller: _genreController,
-                      decoration: _buildInputDecoration(
-                        'Thể loại',
-                        'VD: Tiểu thuyết, Khoa học...',
-                        Icons.category,
-                      ),
-                      style: const TextStyle(color: AppColors.textDark),
+                      label: 'Thể loại',
+                      hint: 'VD: Tiểu thuyết, Khoa học...',
+                      icon: Icons.category,
                       validator: (value) {
-                        if (value != null && value.length > 50) {
-                          return 'Thể loại không vượt quá 50 ký tự';
-                        }
+                        if (value != null && value.length > 50) return 'Thể loại không vượt quá 50 ký tự';
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
+                    _buildModernTextField(
                       controller: _pageCountController,
-                      decoration: _buildInputDecoration(
-                        'Số trang',
-                        '0',
-                        Icons.pages,
-                      ),
-                      style: const TextStyle(color: AppColors.textDark),
+                      label: 'Số trang',
+                      hint: '0',
+                      icon: Icons.pages,
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         if (value != null && value.isNotEmpty) {
                           final page = int.tryParse(value);
-                          if (page == null || page < 1 || page > 99999) {
-                            return 'Số trang phải từ 1 đến 99999';
-                          }
+                          if (page == null || page < 1 || page > 99999) return 'Số trang phải từ 1 đến 99999';
                         }
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
+                    _buildModernTextField(
                       controller: _publishedYearController,
-                      decoration: _buildInputDecoration(
-                        'Năm xuất bản',
-                        '2024',
-                        Icons.calendar_today,
-                      ),
-                      style: const TextStyle(color: AppColors.textDark),
+                      label: 'Năm xuất bản',
+                      hint: '2024',
+                      icon: Icons.calendar_today,
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         if (value != null && value.isNotEmpty) {
                           final year = int.tryParse(value);
-                          if (year == null || year < 1000 || year > 2100) {
-                            return 'Năm xuất bản không hợp lệ';
-                          }
+                          if (year == null || year < 1000 || year > 2100) return 'Năm xuất bản không hợp lệ';
                         }
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _ratingController,
-                      decoration: _buildInputDecoration(
-                        'Rating (0-5)',
-                        '0.0',
-                        Icons.star,
-                      ),
-                      style: const TextStyle(color: AppColors.textDark),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          final rating = double.tryParse(value);
-                          if (rating == null || rating < 0 || rating > 5) {
-                            return 'Rating phải từ 0 đến 5';
-                          }
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
+                    _buildModernTextField(
                       controller: _languageController,
-                      decoration: _buildInputDecoration(
-                        'Ngôn ngữ',
-                        'VD: Tiếng Việt, English...',
-                        Icons.language,
-                      ),
-                      style: const TextStyle(color: AppColors.textDark),
+                      label: 'Ngôn ngữ',
+                      hint: 'VD: Tiếng Việt, English...',
+                      icon: Icons.language,
                       validator: (value) {
-                        if (value != null && value.length > 20) {
-                          return 'Ngôn ngữ không vượt quá 20 ký tự';
-                        }
+                        if (value != null && value.length > 20) return 'Ngôn ngữ không vượt quá 20 ký tự';
                         return null;
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
+                    _buildModernTextField(
                       controller: _fileUrlController,
-                      decoration: _buildInputDecoration(
-                        'URL File',
-                        'https://example.com/book.pdf',
-                        Icons.file_download,
-                      ),
-                      style: const TextStyle(color: AppColors.textDark),
+                      label: 'URL File',
+                      hint: 'https://example.com/book.pdf',
+                      icon: Icons.file_download,
                     ),
                     const SizedBox(height: 24),
                     Row(

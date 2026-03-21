@@ -8,7 +8,7 @@ import 'package:librarybookshelf/services/auther_service.dart';
 class ReadingProgressService {
   static String get baseUrl {
     if (kIsWeb) return 'https://localhost:7094/api/ReadingProgress';
-    if (!kIsWeb && Platform.isAndroid)
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
       return 'https://10.0.2.2:7094/api/ReadingProgress';
     return 'https://localhost:7094/api/ReadingProgress';
   }

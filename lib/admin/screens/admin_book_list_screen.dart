@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:librarybookshelf/admin/models/admin_book_model.dart';
 import 'package:librarybookshelf/admin/services/admin_book_service.dart';
-import 'package:librarybookshelf/admin/widgets/admin_book_form_widgets.dart';
+import 'package:librarybookshelf/admin/screens/admin_create_book_screen.dart';
+import 'package:librarybookshelf/admin/screens/admin_edit_book_screen.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
+import 'admin_book_content_screen.dart';
 
 class AdminBookListScreen extends StatefulWidget {
   const AdminBookListScreen({super.key});
@@ -50,14 +53,9 @@ class _AdminBookListScreenState extends State<AdminBookListScreen> {
   }
 
   void _navigateToCreateBook() async {
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => const CreateBookForm(),
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (ctx) => const AdminCreateBookScreen()),
     );
 
     if (result == true) {
@@ -66,19 +64,36 @@ class _AdminBookListScreenState extends State<AdminBookListScreen> {
   }
 
   void _navigateToEditBook(Map<String, dynamic> book) async {
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => EditBookForm(book: book),
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (ctx) => AdminEditBookScreen(book: book)),
     );
 
     if (result == true) {
       _loadBooks();
     }
+  }
+
+  void _navigateToBookContent(Map<String, dynamic> bookData) {
+    // Convert Map to AdminBookModel
+    final book = AdminBookModel(
+      bookId: bookData['bookId'] ?? 0,
+      title: bookData['title'] ?? '',
+      author: bookData['author'] ?? '',
+      description: bookData['description'],
+      coverImageUrl: bookData['coverImageUrl'],
+      genre: bookData['genre'],
+      pageCount: bookData['pageCount'],
+      publishedYear: bookData['publishedYear'],
+      rating: bookData['rating']?.toDouble(),
+      language: bookData['language'],
+      fileUrl: bookData['fileUrl'],
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (ctx) => AdminBookContentScreen(book: book)),
+    );
   }
 
   Future<void> _deleteBook(int bookId, String title) async {
@@ -379,10 +394,19 @@ class _AdminBookListScreenState extends State<AdminBookListScreen> {
                             ],
                           ),
                           trailing: SizedBox(
-                            width: 100,
+                            width: 130,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.library_books_rounded,
+                                    color: AppColors.accent,
+                                    size: 20,
+                                  ),
+                                  onPressed: () => _navigateToBookContent(book),
+                                  tooltip: 'Quản lý nội dung',
+                                ),
                                 IconButton(
                                   icon: const Icon(
                                     Icons.edit_rounded,

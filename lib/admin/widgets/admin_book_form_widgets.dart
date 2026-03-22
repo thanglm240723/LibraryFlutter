@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:librarybookshelf/admin/services/admin_book_service.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
+import 'package:librarybookshelf/admin/widgets/admin_ui_components.dart';
 
 // ── EDIT BOOK FORM ────────────────────────────────────────────────────
 
 class EditBookForm extends StatefulWidget {
   final Map<String, dynamic> book;
-  const EditBookForm({required this.book});
+  final VoidCallback? onSuccessCallback;
+
+  const EditBookForm({required this.book, this.onSuccessCallback});
 
   @override
   State<EditBookForm> createState() => _EditBookFormState();
@@ -106,9 +109,7 @@ class _EditBookFormState extends State<EditBookForm> {
         publishedYear: _publishedYearController.text.isEmpty
             ? null
             : int.tryParse(_publishedYearController.text),
-        rating: _ratingController.text.isEmpty
-            ? null
-            : double.tryParse(_ratingController.text),
+
         language: _languageController.text.isEmpty
             ? null
             : _languageController.text,
@@ -118,6 +119,7 @@ class _EditBookFormState extends State<EditBookForm> {
       );
 
       if (mounted) {
+        widget.onSuccessCallback?.call();
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -146,12 +148,12 @@ class _EditBookFormState extends State<EditBookForm> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        BookSheetHandle(),
+        AdminSheetHandle(),
         const SizedBox(height: 20),
         ValueListenableBuilder<TextEditingValue>(
           valueListenable: _coverImageUrlController,
           builder: (context, value, child) =>
-              BookImagePreview(imageUrl: value.text),
+              AdminImagePreview(imageUrl: value.text),
         ),
         const SizedBox(height: 20),
         const Text(
@@ -167,62 +169,62 @@ class _EditBookFormState extends State<EditBookForm> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                BookField(
+                AdminInputField(
                   ctrl: _titleController,
                   label: "Tiêu đề *",
                   icon: Icons.title_rounded,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _authorController,
                   label: "Tác giả *",
                   icon: Icons.person_outline_rounded,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _descriptionController,
                   label: "Mô tả",
                   icon: Icons.description_outlined,
                   maxLines: 3,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _coverImageUrlController,
                   label: "URL Hình ảnh bìa",
                   icon: Icons.image,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _genreController,
                   label: "Thể loại",
                   icon: Icons.category,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _pageCountController,
                   label: "Số trang",
                   icon: Icons.pages,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _publishedYearController,
                   label: "Năm xuất bản",
                   icon: Icons.calendar_today,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _ratingController,
                   label: "Rating (0-5)",
                   icon: Icons.star,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _languageController,
                   label: "Ngôn ngữ",
                   icon: Icons.language,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _fileUrlController,
                   label: "URL File",
                   icon: Icons.file_download,
@@ -271,7 +273,9 @@ class _EditBookFormState extends State<EditBookForm> {
 // ── CREATE BOOK FORM ───────────────────────────────────────────────────
 
 class CreateBookForm extends StatefulWidget {
-  const CreateBookForm();
+  final VoidCallback? onSuccessCallback;
+
+  const CreateBookForm({this.onSuccessCallback});
 
   @override
   State<CreateBookForm> createState() => _CreateBookFormState();
@@ -351,9 +355,7 @@ class _CreateBookFormState extends State<CreateBookForm> {
         publishedYear: _publishedYearController.text.isEmpty
             ? null
             : int.tryParse(_publishedYearController.text),
-        rating: _ratingController.text.isEmpty
-            ? null
-            : double.tryParse(_ratingController.text),
+
         language: _languageController.text.isEmpty
             ? null
             : _languageController.text,
@@ -363,6 +365,7 @@ class _CreateBookFormState extends State<CreateBookForm> {
       );
 
       if (mounted) {
+        widget.onSuccessCallback?.call();
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -391,12 +394,12 @@ class _CreateBookFormState extends State<CreateBookForm> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        BookSheetHandle(),
+        AdminSheetHandle(),
         const SizedBox(height: 20),
         ValueListenableBuilder<TextEditingValue>(
           valueListenable: _coverImageUrlController,
           builder: (context, value, child) =>
-              BookImagePreview(imageUrl: value.text),
+              AdminImagePreview(imageUrl: value.text),
         ),
         const SizedBox(height: 20),
         const Text(
@@ -412,62 +415,62 @@ class _CreateBookFormState extends State<CreateBookForm> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                BookField(
+                AdminInputField(
                   ctrl: _titleController,
                   label: "Tiêu đề *",
                   icon: Icons.title_rounded,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _authorController,
                   label: "Tác giả *",
                   icon: Icons.person_outline_rounded,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _descriptionController,
                   label: "Mô tả",
                   icon: Icons.description_outlined,
                   maxLines: 3,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _coverImageUrlController,
                   label: "URL Hình ảnh bìa",
                   icon: Icons.image,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _genreController,
                   label: "Thể loại",
                   icon: Icons.category,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _pageCountController,
                   label: "Số trang",
                   icon: Icons.pages,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _publishedYearController,
                   label: "Năm xuất bản",
                   icon: Icons.calendar_today,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _ratingController,
                   label: "Rating (0-5)",
                   icon: Icons.star,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _languageController,
                   label: "Ngôn ngữ",
                   icon: Icons.language,
                 ),
                 const SizedBox(height: 12),
-                BookField(
+                AdminInputField(
                   ctrl: _fileUrlController,
                   label: "URL File",
                   icon: Icons.file_download,
@@ -511,165 +514,4 @@ class _CreateBookFormState extends State<CreateBookForm> {
       ],
     ),
   );
-}
-
-// ── SHARED WIDGETS ────────────────────────────────────────────────────
-
-class BookSheetHandle extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Container(
-      width: 36,
-      height: 4,
-      decoration: BoxDecoration(
-        color: AppColors.border,
-        borderRadius: BorderRadius.circular(2),
-      ),
-    ),
-  );
-}
-
-class BookField extends StatelessWidget {
-  final TextEditingController ctrl;
-  final String label;
-  final IconData icon;
-  final int maxLines;
-
-  const BookField({
-    required this.ctrl,
-    required this.label,
-    required this.icon,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: AppColors.bg,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: AppColors.border),
-    ),
-    child: TextField(
-      controller: ctrl,
-      maxLines: maxLines,
-      minLines: 1,
-      style: const TextStyle(color: AppColors.textDark, fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: AppColors.textLight, fontSize: 13),
-        prefixIcon: Icon(icon, color: AppColors.textLight, size: 18),
-        border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
-      ),
-    ),
-  );
-}
-
-class BookImagePreview extends StatelessWidget {
-  final String imageUrl;
-
-  const BookImagePreview({required this.imageUrl});
-
-  void _showFullScreenImage(BuildContext context) {
-    if (imageUrl.isEmpty) return;
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: InteractiveViewer(
-            child: Image.network(
-              imageUrl,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.broken_image, size: 64, color: Colors.white),
-                    SizedBox(height: 16),
-                    Text(
-                      'Không thể tải hình ảnh',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _showFullScreenImage(context),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          width: double.infinity,
-          height: 300,
-          child: imageUrl.isNotEmpty
-              ? Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      color: AppColors.bg,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.accent,
-                        ),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: AppColors.chip,
-                    child: const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.broken_image,
-                            color: AppColors.textLight,
-                            size: 48,
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'URL hình ảnh không hợp lệ',
-                            style: TextStyle(color: AppColors.textLight),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-              : Container(
-                  color: AppColors.chip,
-                  child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.image_not_supported,
-                          color: AppColors.textLight,
-                          size: 48,
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Chưa nhập URL hình ảnh',
-                          style: TextStyle(color: AppColors.textLight),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
 }

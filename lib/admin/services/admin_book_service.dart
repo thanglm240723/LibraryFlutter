@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:librarybookshelf/services/auther_service.dart';
@@ -9,7 +9,7 @@ class AdminBookService {
   static String get baseUrl {
     if (kIsWeb) {
       return "https://localhost:7094/api/admin/books";
-    } else if (Platform.isAndroid) {
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
       return "https://10.0.2.2:7094/api/admin/books";
     } else {
       return "https://localhost:7094/api/admin/books";
@@ -83,7 +83,6 @@ class AdminBookService {
     String? genre,
     int? pageCount,
     int? publishedYear,
-    double? rating,
     String? language,
     String? fileUrl,
   }) async {
@@ -98,7 +97,6 @@ class AdminBookService {
         'genre': genre,
         'pageCount': pageCount,
         'publishedYear': publishedYear,
-        'rating': rating,
         'language': language,
         'fileUrl': fileUrl,
       };
@@ -142,7 +140,6 @@ class AdminBookService {
     String? genre,
     int? pageCount,
     int? publishedYear,
-    double? rating,
     String? language,
     String? fileUrl,
   }) async {
@@ -157,7 +154,6 @@ class AdminBookService {
         'genre': genre,
         'pageCount': pageCount,
         'publishedYear': publishedYear,
-        'rating': rating,
         'language': language,
         'fileUrl': fileUrl,
       };

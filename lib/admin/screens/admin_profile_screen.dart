@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:librarybookshelf/services/auther_service.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
 import 'admin_book_list_screen.dart';
+import 'admin_book_content_list_screen.dart';
+import 'package:librarybookshelf/admin/widgets/admin_ui_components.dart';
 
 class AdminProfileScreen extends StatefulWidget {
   const AdminProfileScreen({super.key});
@@ -102,7 +104,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SheetHandle(),
+              AdminSheetHandle(),
               const SizedBox(height: 20),
               const Text(
                 "Đổi mật khẩu",
@@ -113,21 +115,21 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              _PassField(
+              AdminPassField(
                 ctrl: oldCtrl,
                 label: "Mật khẩu hiện tại",
                 obscure: obscureOld,
                 onToggle: () => setModal(() => obscureOld = !obscureOld),
               ),
               const SizedBox(height: 12),
-              _PassField(
+              AdminPassField(
                 ctrl: newCtrl,
                 label: "Mật khẩu mới",
                 obscure: obscureNew,
                 onToggle: () => setModal(() => obscureNew = !obscureNew),
               ),
               const SizedBox(height: 12),
-              _PassField(
+              AdminPassField(
                 ctrl: confirmCtrl,
                 label: "Xác nhận mật khẩu mới",
                 obscure: obscureConfirm,
@@ -202,7 +204,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SheetHandle(),
+            AdminSheetHandle(),
             const SizedBox(height: 20),
             const Text(
               "Thông tin cá nhân",
@@ -213,13 +215,13 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _InputField(
+            AdminInputField(
               ctrl: nameCtrl,
               label: "Họ và tên",
               icon: Icons.person_outline_rounded,
             ),
             const SizedBox(height: 12),
-            _InputField(
+            AdminInputField(
               ctrl: emailCtrl,
               label: "Email",
               icon: Icons.email_outlined,
@@ -411,17 +413,17 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Tài khoản
-                    _SectionLabel("TÀI KHOẢN"),
+                    AdminSectionLabel("TÀI KHOẢN"),
                     const SizedBox(height: 8),
-                    _MenuGroup(
+                    AdminMenuGroup(
                       items: [
-                        _MenuItem(
+                        AdminMenuItem(
                           icon: Icons.person_outline_rounded,
                           label: "Thông tin cá nhân",
                           sub: "@$username",
                           onTap: _showEditProfile,
                         ),
-                        _MenuItem(
+                        AdminMenuItem(
                           icon: Icons.lock_outline_rounded,
                           label: "Đổi mật khẩu",
                           sub: "Cập nhật mật khẩu bảo mật",
@@ -433,11 +435,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                     const SizedBox(height: 20),
 
                     // QUẢN LÝ
-                    _SectionLabel("QUẢN LÝ"),
+                    AdminSectionLabel("QUẢN LÝ"),
                     const SizedBox(height: 8),
-                    _MenuGroup(
+                    AdminMenuGroup(
                       items: [
-                        _MenuItem(
+                        AdminMenuItem(
                           icon: Icons.auto_stories_rounded,
                           label: "Quản lý sách",
                           sub: "Thêm, sửa, xóa sách",
@@ -446,6 +448,20 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (ctx) => const AdminBookListScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        AdminMenuItem(
+                          icon: Icons.library_books_rounded,
+                          label: "Quản lý nội dung",
+                          sub: "Thêm, sửa, xóa chương",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (ctx) =>
+                                    const AdminBookContentListScreen(),
                               ),
                             );
                           },
@@ -498,211 +514,4 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       ),
     );
   }
-}
-
-// ── HELPER WIDGETS ────────────────────────────────────────────────────
-
-class _SheetHandle extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Container(
-      width: 36,
-      height: 4,
-      decoration: BoxDecoration(
-        color: AppColors.border,
-        borderRadius: BorderRadius.circular(2),
-      ),
-    ),
-  );
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: const TextStyle(
-      fontSize: 11,
-      fontWeight: FontWeight.w700,
-      color: AppColors.textLight,
-      letterSpacing: 1.2,
-    ),
-  );
-}
-
-class _MenuGroup extends StatelessWidget {
-  final List<_MenuItem> items;
-  const _MenuGroup({required this.items});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: AppColors.border),
-    ),
-    child: Column(
-      children: items.asMap().entries.map((e) {
-        final isLast = e.key == items.length - 1;
-        return Column(
-          children: [
-            e.value,
-            if (!isLast)
-              const Divider(
-                height: 1,
-                color: AppColors.divider,
-                indent: 52,
-                endIndent: 0,
-              ),
-          ],
-        );
-      }).toList(),
-    ),
-  );
-}
-
-class _MenuItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String? sub;
-  final VoidCallback onTap;
-
-  const _MenuItem({
-    required this.icon,
-    required this.label,
-    this.sub,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(14),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.chip,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: AppColors.textMid, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textDark,
-                  ),
-                ),
-                if (sub != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    sub!,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textLight,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.textLight,
-            size: 18,
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _PassField extends StatelessWidget {
-  final TextEditingController ctrl;
-  final String label;
-  final bool obscure;
-  final VoidCallback onToggle;
-  const _PassField({
-    required this.ctrl,
-    required this.label,
-    required this.obscure,
-    required this.onToggle,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: AppColors.bg,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: AppColors.border),
-    ),
-    child: TextField(
-      controller: ctrl,
-      obscureText: obscure,
-      style: const TextStyle(color: AppColors.textDark, fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: AppColors.textLight, fontSize: 13),
-        prefixIcon: const Icon(
-          Icons.lock_outline_rounded,
-          color: AppColors.textLight,
-          size: 18,
-        ),
-        suffixIcon: IconButton(
-          onPressed: onToggle,
-          icon: Icon(
-            obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-            color: AppColors.textLight,
-            size: 18,
-          ),
-        ),
-        border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-      ),
-    ),
-  );
-}
-
-class _InputField extends StatelessWidget {
-  final TextEditingController ctrl;
-  final String label;
-  final IconData icon;
-  const _InputField({
-    required this.ctrl,
-    required this.label,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: AppColors.bg,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: AppColors.border),
-    ),
-    child: TextField(
-      controller: ctrl,
-      style: const TextStyle(color: AppColors.textDark, fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: AppColors.textLight, fontSize: 13),
-        prefixIcon: Icon(icon, color: AppColors.textLight, size: 18),
-        border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-      ),
-    ),
-  );
 }

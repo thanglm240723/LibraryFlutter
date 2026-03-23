@@ -8,6 +8,7 @@ import 'package:librarybookshelf/services/user_library_service.dart';
 import '../models/book_model.dart';
 import '../services/book_service.dart';
 import '../theme/app_theme.dart';
+import 'package:librarybookshelf/admin/screens/admin_home_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isLoggedIn = false;
   String _displayName = '';
+  bool _isAdmin = false;
 
   // ── Set bookId đã lưu — để BookCard biết trạng thái ────────────
   Set<int> _savedBookIds = {};
@@ -42,8 +44,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final loggedIn = await AuthService.isLoggedIn();
     if (loggedIn) {
       final info = await AuthService.getUserInfo();
+      final admin = await AuthService.isAdmin();
       setState(() {
         _isLoggedIn = true;
+        _isAdmin = admin;
         final fn = info?['fullName'] ?? '';
         final uname = info?['username'] ?? '';
         _displayName = fn.isNotEmpty ? fn.split(' ').last : uname;
@@ -54,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _isLoggedIn = false;
         _savedBookIds = {};
+        _isAdmin = false;
       });
     }
   }
@@ -242,6 +247,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const Spacer(),
           if (_isLoggedIn) ...[
+            if (_isAdmin) ...[
+              IconButton(
+                onPressed: () => Navigator.pushNamed(context, '/admin'),
+                icon: const Icon(
+                  Icons.admin_panel_settings_rounded,
+                  color: AppColors.accent,
+                  size: 18,
+                ),
+              ),
+            ],
             GestureDetector(
               onTap: () async {
                 await Navigator.push(

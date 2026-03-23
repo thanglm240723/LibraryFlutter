@@ -5,6 +5,7 @@ import 'register_page.dart';
 import 'profile_screen.dart';
 import 'admin/screens/admin_profile_screen.dart';
 import 'admin/screens/admin_book_list_screen.dart';
+import 'admin/screens/admin_home_screen.dart';
 import 'services/auther_service.dart';
 import 'services/env_loader.dart';
 import 'services/firebase_config.dart';
@@ -80,6 +81,7 @@ class _MyAppState extends State<MyApp> {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/home': (context) => const HomeScreen(),
+        '/admin': (context) => const AdminHomeScreen(),
         '/admin-profile': (context) => const AdminProfileScreen(),
       },
     );

@@ -6,6 +6,10 @@ import 'package:librarybookshelf/services/profile_service.dart';
 import 'package:librarybookshelf/theme/app_theme.dart';
 import 'package:librarybookshelf/saved_books_screen.dart';
 import 'package:librarybookshelf/leaderboard_screen.dart';
+import 'package:librarybookshelf/recommendation_screen.dart';
+import 'package:librarybookshelf/reading_history_screen.dart';
+import 'package:librarybookshelf/settings_screen.dart';
+import 'package:librarybookshelf/feedback_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -817,12 +821,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
+                          _MenuItem(
+                            icon: Icons.thumb_up_alt_outlined,
+                            label: 'Gợi ý sách',
+                            sub: 'Mẹo & gợi ý',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RecommendationScreen(),
+                              ),
+                            ),
+                          ),
                           // ── Lịch sử đọc — không code màn mới ────────────
                           _MenuItem(
                             icon: Icons.history_rounded,
                             label: 'Lịch sử đọc',
                             sub: 'Các phiên đọc gần đây',
-                            onTap: _showReadingHistory,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ReadingHistoryScreen(),
+                              ),
+                            ),
                           ),
                           _MenuItem(
                             icon: Icons.leaderboard_rounded,
@@ -848,6 +868,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             label: 'Về ứng dụng',
                             sub: 'BookShelf v1.0.0',
                             onTap: () => _showAbout(),
+                          ),
+                          _MenuItem(
+                            icon: Icons.settings_outlined,
+                            label: 'Cài đặt',
+                            sub: 'Tùy chỉnh ứng dụng',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SettingsScreen(),
+                              ),
+                            ),
+                          ),
+                          _MenuItem(
+                            icon: Icons.feedback_outlined,
+                            label: 'Phản hồi',
+                            sub: 'Gửi ý kiến đến chúng tôi',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const FeedbackScreen(),
+                              ),
+                            ),
                           ),
                         ],
                       ),
